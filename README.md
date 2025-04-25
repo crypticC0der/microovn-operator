@@ -10,10 +10,11 @@ Use links instead.
 
 # microovn-charm
 
-Charmhub package name: operator-template
 More information: https://charmhub.io/microovn-charm
 
-Describe your charm in one or two sentences.
+This is a thin layer over [MicroOVN](https://github.com/canonical/microovn), to allow MicroOVN to be used within the charm ecosystem. 
+
+This is very much a work in progress.
 
 ## Other resources
 
