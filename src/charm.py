@@ -35,9 +35,6 @@ class MicroovnCharmCharm(ops.CharmBase):
 
 
     def update_tokens(self, relation_name):
-        if not self.lead_control_plane:
-            return
-
         relation = self.model.get_relation(relation_name)
         if relation == None:
             return
@@ -45,21 +42,13 @@ class MicroovnCharmCharm(ops.CharmBase):
         relation_data = relation.data
 
         newToken = False
-        logger.info("updating tokens")
-        logger.info(self.unit.name)
-        logger.info(relation_data)
-        logger.info(relation_name)
         for unit in relation_data:
             # need hostname
-            logger.info(unit.name)
             if not "hostname" in relation_data[unit]:
-                logger.info("no hostname")
-                logger.info(relation_data[unit])
                 continue
+
             # dont generate token for self or already generated
-            if self.unit.name == unit.name or unit.name in relation_data[self.app]:
-                logger.info("self or generated")
-                logger.info(relation_data[self.app])
+            if self.unit.name == unit.name or unit.name in relation_data[self.unit]:
                 continue
 
             # get hostname
@@ -67,7 +56,6 @@ class MicroovnCharmCharm(ops.CharmBase):
             token = os.popen(
                     "microovn cluster add {}".format(hostname)).read()
             token = token.strip()
-            logger.info("worker token written")
             relation.data[self.unit][unit.name] = token
             logger.info("added token to {}".format(unit.name))
             newToken=True
@@ -80,7 +68,6 @@ class MicroovnCharmCharm(ops.CharmBase):
         framework.observe(self.on.start, self._on_start)
         framework.observe(self.on.install, self._on_install)
         framework.observe(self.on.remove, self._on_remove)
-        logger.info(self.on)
         if self.is_control_plane:
             framework.observe(self.on[CONTROL_RELATION].relation_changed,
                               self._on_peers_changed)
@@ -123,8 +110,6 @@ class MicroovnCharmCharm(ops.CharmBase):
     def _on_start(self, event: ops.StartEvent):
         """Handle start event."""
         self.add_hostname(self.relevant_relation)
-        relation = self.model.get_relation(self.relevant_relation)
-        logger.info(relation.data)
 
         if not self.lead_control_plane:
             return
@@ -140,8 +125,8 @@ class MicroovnCharmCharm(ops.CharmBase):
         os.system("microovn cluster remove {}".format(os.uname()[1]))
 
     def _handle_relation_joined(self, relation_name):
-        if not self.unit.is_leader():
-            return True
+        if not self.unit.is_leader() or not self._stored.in_cluster:
+            return False
 
         if self.update_tokens(relation_name):
             return True
@@ -149,23 +134,18 @@ class MicroovnCharmCharm(ops.CharmBase):
 
 
     def _on_cluster_changed(self, event: ops.RelationChangedEvent):
-        r = self.model.get_relation(WORKER_RELATION)
-        logger.info(r.data)
-
         if not self._stored.in_cluster:
             if (token := self.find_token(WORKER_RELATION)):
                 self.join_with_token(token)
 
+        self._handle_relation_joined(WORKER_RELATION)
+
     def _on_peers_changed(self, event: ops.RelationChangedEvent):
-        r = self.model.get_relation(CONTROL_RELATION)
-        logger.info(r.data)
-
-        if self.lead_control_plane:
-            self._handle_relation_joined(CONTROL_RELATION)
-
         if not self.unit.is_leader() and not self._stored.in_cluster:
             if (token := self.find_token(CONTROL_RELATION)):
                 self.join_with_token(token)
+
+        self._handle_relation_joined(CONTROL_RELATION)
 
 if __name__ == "__main__":  # pragma: nocover
     ops.main(MicroovnCharmCharm)
