@@ -1,5 +1,5 @@
 DIRNAME := $(shell basename $(CURDIR))
-CHARMFILE := $(DIRNAME)_ubuntu-22.04-amd64.charm 
+CHARMFILE := microovn-token-distributor_ubuntu-22.04-amd64.charm 
 
 build: $(CHARMFILE)
 
