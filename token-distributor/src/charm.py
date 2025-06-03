@@ -11,7 +11,8 @@ class TokenDistributor(ops.CharmBase):
     def handle_mirror(self, relation_name):
         if relation := self.model.get_relation(relation_name):
             relation_data = relation.data
-            for unit in relation_data:
+            relation_data[self.unit]["mirror"]="up"
+            for unit in relation.units:
                 if relation_data[unit].get("mirror") == "up":
                     # add all tokens in the other side of the mirror to this side
                     for k, v in relation_data[unit].items():
@@ -20,8 +21,7 @@ class TokenDistributor(ops.CharmBase):
                 if not "hostname" in relation_data[unit]:
                     continue
                 mirror_key = mirrorid(relation_data[unit]["hostname"])
-                if self.unit.name != unit.name and \
-                   not mirror_key in relation_data[self.unit]:
+                if not mirror_key in relation_data[self.unit]:
                     logger.info("added {0} to mirror".format(mirror_key))
                     relation_data[self.unit][mirror_key] = "empty"
 
