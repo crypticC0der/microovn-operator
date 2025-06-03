@@ -4,8 +4,8 @@ CHARMFILE := microovn_ubuntu-22.04-amd64.charm
 build: $(CHARMFILE)
 
 $(CHARMFILE): src/charm.py charmcraft.yaml
-	charmcraft pack
+	charmcraft pack -v
 
 clean:
 	charmcraft clean
-	rm $(CHARMFILE)
+	rm $(CHARMFILE) -f
