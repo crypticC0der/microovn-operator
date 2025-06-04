@@ -126,7 +126,7 @@ class MicroovnCharm(ops.CharmBase):
 
     def _on_leader_elected(self, _: ops.RelationChangedEvent):
         if relation := self.model.get_relation(WORKER_RELATION):
-            self.update_mirror_state(event.relation.data)
+            self.update_mirror_state(relation.data)
 
     def _on_cluster_changed(self, event: ops.RelationChangedEvent):
         if not self._stored.in_cluster:
