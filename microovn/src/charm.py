@@ -8,37 +8,37 @@ MIRROR_PREFIX = "mirror-"
 def get_hostname():
     return os.uname().nodename
 
-def mirrorid(hostname):
+def mirror_id(hostname):
     return MIRROR_PREFIX + hostname
 
 class MicroovnCharm(ops.CharmBase):
     _stored = ops.StoredState()
 
-    def update_tokens(self, relation_name):
-        if not (relation := self.model.get_relation(relation_name)):
-            return False
+    def update_mirror_state(self, relation_data):
+        if self.unit.is_leader():
+            relation_data[self.unit]["mirror"]="up"
+        elif relation_data[self.unit].get("mirror"):
+            relation_data[self.unit]["mirror"]="down"
 
+    def update_tokens(self, relation):
         relation_data = relation.data
-        if "mirror" not in relation_data[self.unit]:
-            relation_data[self.unit]["mirror"] = "up"
-
-        distributor_mirrors = {
+        distributor_mirrors = [
             unit
             for unit in relation.units
             if (mirror := relation_data[unit].get("mirror")) and mirror == "up"
-        }
+        ]
 
         if len(distributor_mirrors) != 1:
             return False
 
-        (distributor_unit, ) = distributor_mirrors
-        distributor_mirror = relation_data[distributor_unit]
-        newToken = False
+        distributor_mirror = relation_data[distributor_mirrors[0]]
+        new_token = False
 
         # found token distributor leader
         for mirror_key in distributor_mirror.keys():
-            if MIRROR_PREFIX not in mirror_key:
+            if not mirror_key.startswith(MIRROR_PREFIX):
                 continue
+
             hostname = mirror_key[len(MIRROR_PREFIX):]
 
             # skip if token generated
@@ -52,9 +52,9 @@ class MicroovnCharm(ops.CharmBase):
             token = token.strip()
             relation_data[self.unit][mirror_key] = token
             logger.info("added token for {}".format(hostname))
-            newToken=True
+            new_token=True
 
-        return newToken
+        return new_token
 
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
@@ -73,16 +73,13 @@ class MicroovnCharm(ops.CharmBase):
         relation = self.model.get_relation(relation_name)
         relation.data[self.unit]["hostname"] = get_hostname()
 
-    def find_token(self, relation_name):
-        if not (relation := self.model.get_relation(relation_name)):
-            return False
-
-        tokens = {
+    def find_token(self, relation):
+        tokens = [
             token
             for unit in relation.units
-            if (token := relation.data[unit].get(mirrorid(get_hostname()))) and \
+            if (token := relation.data[unit].get(mirror_id(get_hostname()))) and \
             token != "empty"
-        }
+        ]
         if len(tokens) > 1:
             self.unit.status = ops.MaintenanceStatus("Too many tokens")
             return False
@@ -91,8 +88,7 @@ class MicroovnCharm(ops.CharmBase):
             return False
 
         logger.info("found token")
-        (token, ) = tokens
-        return token
+        return tokens[0]
 
     def join_with_token(self, token):
         self.unit.status = ops.MaintenanceStatus("Joining cluster")
@@ -120,34 +116,25 @@ class MicroovnCharm(ops.CharmBase):
 
     def _handle_relation_created(self, event: ops.RelationCreatedEvent):
         self.add_hostname(WORKER_RELATION)
+        self.update_mirror_state(event.relation.data)
         if self.unit.is_leader():
-            self.update_tokens(WORKER_RELATION)
+            self.update_tokens(event.relation)
 
     def _on_remove(self, event: ops.RemoveEvent):
         if self._stored.in_cluster:
             os.system("microovn cluster remove {}".format(get_hostname()))
 
-    def _handle_relation_joined(self, relation_name):
-        if not self.unit.is_leader() or not self._stored.in_cluster:
-            return False
-
-        return self.update_tokens(relation_name)
-
-    def _on_leader_elected(self, event: ops.RelationChangedEvent):
-        if not (relation := self.model.get_relation(WORKER_RELATION)):
-            return
-
-        if self.unit.is_leader():
-            relation.data[self.unit]["mirror"]="up"
-        elif relation.data[self.unit].get("mirror"):
-            relation.data[self.unit]["mirror"]="down"
+    def _on_leader_elected(self, _: ops.RelationChangedEvent):
+        if relation := self.model.get_relation(WORKER_RELATION):
+            self.update_mirror_state(event.relation.data)
 
     def _on_cluster_changed(self, event: ops.RelationChangedEvent):
         if not self._stored.in_cluster:
-            if (token := self.find_token(WORKER_RELATION)):
+            if (token := self.find_token(event.relation)):
                 self.join_with_token(token)
 
-        self._handle_relation_joined(WORKER_RELATION)
+        if self.unit.is_leader() and self._stored.in_cluster:
+            return self.update_tokens(event.relation)
 
 if __name__ == "__main__":  # pragma: nocover
     ops.main(MicroovnCharm)
