@@ -8,9 +8,9 @@ Avoid using this README file for information that is maintained or published els
 Use links instead.
 -->
 
-# microovn-charm
+# microovn-operator
 
-More information: https://charmhub.io/microovn-charm
+More information: https://charmhub.io/microovn-operator
 
 This is a thin layer over [MicroOVN](https://github.com/canonical/microovn), to allow MicroOVN to be used within the charm ecosystem. 
 

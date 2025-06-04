@@ -2,7 +2,7 @@
 # See https://juju.is/docs/sdk/charmcraft-config for guidance.
 
 # (Required)
-name: microovn-charm
+name: microovn
 
 
 # (Required)
@@ -28,13 +28,17 @@ description: |
 
 
 # (Required for 'charm' type)
-bases:
-  - build-on:
-    - name: ubuntu
-      channel: "22.04"
-    run-on:
-    - name: ubuntu
-      channel: "22.04"
+base: ubuntu@24.04
+platforms:
+  amd64:
+    build-on: [amd64]
+    build-for: [amd64]
+
+parts:
+  charm:
+    build-packages:
+      - git
+      - python3-dev
 
 config:
   options:
@@ -42,6 +46,11 @@ config:
       default: "info"
       type: string
 
-peers:
-  microovn-peers:
-    interface: microovn-charm
+requires:
+  cluster:
+    # interface to connect with the k8s charm to provide
+    # authentication token via a secret in order to cluster
+    # this machine as a worker unit.
+    #   juju integrate k8s:k8s-cluster k8s-worker:cluster
+    interface: worker-cluster
+    limit: 1
