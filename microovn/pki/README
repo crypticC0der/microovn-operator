@@ -1,0 +1,6 @@
+This directory holds CA certificate and private key provided by other
+charms via tls_certificates relation.
+
+It is OK for this directory to be empty if MicroOVN charm is not related
+to a certificate provider. In such scenario, MicroOVN will use automatically
+generated (self-signed) CA certificate instead.
