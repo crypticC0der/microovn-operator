@@ -1,0 +1,18 @@
+name: microovn
+summary: A thin layer around MicroOVN, to allow it to be used as a charm
+description: |
+  A thin layer over the software defined networking project MicroOVN.
+  This is a machine charm that primarily allows MicroOVN to be used easily within
+  Juju, enabling its many ease-of-use features to integrate with the charm ecosystem.
+
+  This charm is still under development.
+
+maintainers:
+  - MJ Ponsonby <mj.ponsonby@canonical.co.uk>
+
+base: ubuntu@24.04
+
+requires:
+  cluster:
+    interface: worker-cluster
+    limit: 1
