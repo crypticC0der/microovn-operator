@@ -2,30 +2,11 @@
 # See https://juju.is/docs/sdk/charmcraft-config for guidance.
 
 # (Required)
-name: microovn
-
-
-# (Required)
 type: charm
 
 
 # (Recommended)
 title: MicroOVN Charm
-
-
-# (Required)
-summary: A thin layer around MicroOVN, to allow it to be used as a charm
-
-
-# (Required)
-description: |
-  A thin layer over the software defined networking project MicroOVN.
-  This is a machine charm that primarily allows MicroOVN to be used easily within
-  juju, allowing its many ease of use features to be used within the charm
-  ecosystem.
-
-  This is very much in development
-
 
 # (Required for 'charm' type)
 base: ubuntu@24.04
