@@ -27,22 +27,22 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: microovn
-      - run: |
-          # NOTE this here to demonstrate use of workflow,
-          #      replace with actual tests.
-          echo ${{ needs.pack-microcluster-token-distributor.outputs.charms }}
-          for charm in ${{ needs.pack-microcluster-token-distributor.outputs.charms }}; do
-            mkdir charm
-            pushd charm
-            unzip ../$charm
-            popd
-            rm -rf charm
-          done
-          echo ${{ needs.pack-microovn.outputs.charms }}
-          for charm in ${{ needs.pack-microovn.outputs.charms }}; do
-            mkdir charm
-            pushd charm
-            unzip ../$charm
-            popd
-            rm -rf charm
-          done
+
+      - name: Set charm paths
+        run: |
+          set -- ${{ needs.pack-microovn.outputs.charms }}
+          echo "MICROOVN_CHARM_PATH=$1" >> $GITHUB_ENV
+          set -- ${{ needs.pack-microcluster-token-distributor.outputs.charms }}
+          echo "TOKEN_DISTRIBUTOR_CHARM_PATH=$1" >> $GITHUB_ENV
+
+      - name: Install dependencies
+        run: |
+          sudo apt -yqq install tox
+          sudo snap install concierge --classic
+
+      - name: Prepare Environment for functional tests
+        run: |
+          sudo concierge prepare -p machine
+
+      - name: Run test
+        run: make test
