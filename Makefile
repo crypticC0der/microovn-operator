@@ -9,10 +9,8 @@ build:
 	done
 
 $(VENV):
-	python3 -m venv $(VENV)
-	$(PIP) install --upgrade pip
-	$(PIP) install pytest
-	$(PIP) install jubilant
+	python3 -m venv $(VENV) --upgrade-deps
+	$(PIP) install -r tests/requirements.txt
 
 test: $(VENV)
 	./$(VENV)/bin/pytest tests
