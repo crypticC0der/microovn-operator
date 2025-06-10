@@ -37,7 +37,6 @@ jobs:
 
       - name: Install dependencies
         run: |
-          sudo apt -yqq install tox
           sudo snap install concierge --classic
 
       - name: Prepare Environment for functional tests
