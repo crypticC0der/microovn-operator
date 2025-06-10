@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-import logging, ops, os
+import json
+import logging
+import os
+import time
+import subprocess
+
+import ops
 
 logger = logging.getLogger(__name__)
 WORKER_RELATION = "cluster"
@@ -11,11 +17,64 @@ def get_hostname():
 def mirror_id(hostname):
     return MIRROR_PREFIX + hostname
 
+def call_microovn_command(*args):
+    result = subprocess.run(
+        ["microovn", *args],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        text=True
+    )
+    return result.returncode, result.stdout
+
 class MicroovnCharm(ops.CharmBase):
     _stored = ops.StoredState()
 
+    def wait_for_pending(self):
+        self.unit.status = ops.WaitingStatus("Waiting on pending nodes")
+        pending_nodes = True
+        while pending_nodes:
+            pending_nodes = False
+            error, output = call_microovn_command("cluster", "list",
+                                                  "-f", "json")
+            if error:
+                logger.error(
+                    "{0} calling cluster list failed with code {1}".format(
+                        get_hostname(),error))
+                return False
+            json_output = json.loads(output)
+            for x in json_output:
+                if x["role"] == "PENDING":
+                    pending_nodes=True
+                    time.sleep(1)
+                    break
+        self.unit.status = ops.ActiveStatus()
+        return True
+
+    def handle_mirror(self, relation):
+        self.update_mirror_state(relation.data)
+        if self.is_communicator_node():
+            return self.update_tokens(relation)
+
+    def is_communicator_node(self):
+        #needs to be in cluster and the pending wait must succeed
+        if not self._stored.in_cluster or not self.wait_for_pending():
+            return False
+        error, output = call_microovn_command("cluster", "list",
+                                                "-f", "json")
+        if error:
+            logger.error("{0} calling cluster list failed with code {1}".format(
+                    get_hostname(),error))
+            return False
+        json_output = json.loads(output)
+        #get nodenames for online voters
+        voter_names = [ x["name"] for x in json_output
+                        if (x["role"] in "voter") and (x["status"] == "ONLINE") ]
+        # return True if there are names and its the lowest name
+        return (len(voter_names) > 0) and (get_hostname() == min(voter_names))
+
     def update_mirror_state(self, relation_data):
-        if self.unit.is_leader():
+        logger.info("updating mirror status")
+        if self.is_communicator_node():
             relation_data[self.unit]["mirror"]="up"
         elif relation_data[self.unit].get("mirror"):
             relation_data[self.unit]["mirror"]="down"
@@ -47,22 +106,20 @@ class MicroovnCharm(ops.CharmBase):
                 continue
 
             #generate token and add to this side of mirror
-            token = os.popen(
-                    "microovn cluster add {}".format(hostname)).read()
-            token = token.strip()
-            relation_data[self.unit][mirror_key] = token
-            logger.info("added token for {}".format(hostname))
-            new_token=True
+            error, token = call_microovn_command("cluster", "add", hostname)
+            if not error:
+                token = token.strip()
+                relation_data[self.unit][mirror_key] = token
+                logger.info("added token for {}".format(hostname))
+                new_token=True
 
         return new_token
 
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
         self._stored.set_default(in_cluster=False)
-        framework.observe(self.on.start, self._on_start)
         framework.observe(self.on.install, self._on_install)
         framework.observe(self.on.remove, self._on_remove)
-        framework.observe(self.on.leader_elected , self._on_leader_elected)
         framework.observe(self.on[WORKER_RELATION].relation_changed,
                             self._on_cluster_changed)
         framework.observe(self.on[WORKER_RELATION].relation_created,
@@ -92,49 +149,83 @@ class MicroovnCharm(ops.CharmBase):
 
     def join_with_token(self, token):
         self.unit.status = ops.MaintenanceStatus("Joining cluster")
-        os.system("microovn cluster join {}".format(token))
+        error, _ = call_microovn_command("cluster", "join", token)
+        if error:
+            return False
         self._stored.in_cluster=True
         self.unit.status = ops.ActiveStatus("Joined cluster")
+        return True
 
     def _on_install(self, event: ops.InstallEvent):
-        self.unit.status = ops.MaintenanceStatus("installing microovn snap")
-        os.system("snap install microovn --channel latest/edge")
-        self.unit.status = ops.MaintenanceStatus("waiting for microovn ready")
-        os.system("microovn waitready")
-        self.unit.status = ops.MaintenanceStatus("waiting for cluster setup")
+        self.unit.status = ops.MaintenanceStatus("Installing microovn snap")
 
-    def _on_start(self, event: ops.StartEvent):
-        if self.unit.is_leader():
-            # only bootstrap if leader
-            # TODO: fix cluster bootstrapped, leader changes to new node not in
-            #       cluster, bootstrapps new cluster can be fixed via having some
-            #       other characteristic determine who manages this side of the
-            #       mirror ie: microcluster leader
-            os.system(f"microovn cluster bootstrap")
-            self._stored.in_cluster = True
-            self.unit.status = ops.ActiveStatus("cluster bootstrapped")
+        subprocess.run(
+            ["snap", "install", "microovn", "--channel", "latest/edge"],
+            check=True)
+        self.unit.status = ops.MaintenanceStatus("Waiting for microovn ready")
+        retries = 0
+        while (code := call_microovn_command("waitready")[0]):
+            retries+=1
+            if retries>3:
+                logger.error(
+                    "microovn waitready failed with error code {0}".format(code))
+                raise RuntimeError("microovn waitready failed 3 times")
+            self.unit.status = ops.MaintenanceStatus(
+                "Microovn waitready failed, retry {0}".format(retries))
+            time.sleep(1)
+        if not (relation := self.model.get_relation(WORKER_RELATION)):
+            self.unit.status = ops.MaintenanceStatus(
+                "Waiting for token distrbutor relation")
+
+    def any_token_exists(self, relation):
+        for unit in relation.units:
+            for k in relation.data[unit].keys():
+                if k.startswith(MIRROR_PREFIX) and \
+                   relation.data[unit][k] != "empty":
+                    return True
+        return False
 
     def _handle_relation_created(self, event: ops.RelationCreatedEvent):
         self.add_hostname(WORKER_RELATION)
-        self.update_mirror_state(event.relation.data)
-        if self.unit.is_leader():
-            self.update_tokens(event.relation)
+
+        token_in_cluster = False
+        if relation := self.model.get_relation(WORKER_RELATION):
+            token_in_cluster = self.any_token_exists(relation)
+
+        if not self._stored.in_cluster and self.unit.is_leader() and \
+           not token_in_cluster:
+            error, _ = call_microovn_command("cluster", "bootstrap")
+            if error:
+                logger.error("{0} unable to bootstrap cluster".format(
+                    get_hostname()))
+                self.unit.status = ops.BlockedStatus("Unable to bootstrap cluster")
+                event.defer()
+                return
+            self._stored.in_cluster = True
+            self.unit.status = ops.ActiveStatus("Cluster bootstrapped")
+            self.handle_mirror(event.relation)
+
 
     def _on_remove(self, event: ops.RemoveEvent):
         if self._stored.in_cluster:
-            os.system("microovn cluster remove {}".format(get_hostname()))
-
-    def _on_leader_elected(self, _: ops.RelationChangedEvent):
-        if relation := self.model.get_relation(WORKER_RELATION):
-            self.update_mirror_state(relation.data)
+            error, _ = call_microovn_command("cluster", "remove", get_hostname())
+            if error:
+                logger.error("failed removing {0} from cluster".format(
+                    get_hostname()))
 
     def _on_cluster_changed(self, event: ops.RelationChangedEvent):
         if not self._stored.in_cluster:
             if (token := self.find_token(event.relation)):
-                self.join_with_token(token)
+                successful = self.join_with_token(token)
+                if not successful:
+                    self.unit.status = ops.BlockedStatus("Joining cluster failed")
+                    logger.error(
+                        "failed {0} joining cluster with token: {1}".format(
+                            get_hostname(),token))
+                    event.defer()
+                    return
 
-        if self.unit.is_leader() and self._stored.in_cluster:
-            return self.update_tokens(event.relation)
+        self.handle_mirror(event.relation)
 
 if __name__ == "__main__":  # pragma: nocover
     ops.main(MicroovnCharm)
