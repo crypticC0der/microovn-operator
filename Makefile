@@ -1,4 +1,5 @@
 VENV := .venv
+PARALLEL ?= 1
 PYTHON := $(VENV)/bin/python
 PIP := $(VENV)/bin/pip
 CHARMS := token-distributor microovn
@@ -13,7 +14,7 @@ $(VENV):
 	$(PIP) install -r tests/requirements.txt
 
 test: $(VENV)
-	./$(VENV)/bin/pytest tests
+	./$(VENV)/bin/pytest -v -n $(PARALLEL) tests
 
 clean:
 	$(MAKE) -C token-distributor clean

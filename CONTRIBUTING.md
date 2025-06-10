@@ -16,6 +16,13 @@ sudo concierge prepare -p machine
 make test
 ```
 
+Optionally tests may be run in parallel, for environments with sufficient
+resources:
+
+```shell
+make test PARALLEL=4
+```
+
 ## Build the charms
 
 Build the charms in this git repository using:

@@ -1,4 +1,8 @@
-import pytest, jubilant, os
+import os
+import time
+
+import jubilant
+import pytest
 
 microovn_charm_path = "./" + os.environ.get("MICROOVN_CHARM_PATH")
 if microovn_charm_path is None:
@@ -10,8 +14,19 @@ if token_distributor_charm_path is None:
 
 @pytest.fixture
 def juju():
-    with jubilant.temp_model() as juju:
-        yield juju
+    # NOTE workaround for juju add-model leading to transaction aborted
+    #      error when running in parallel (LP: #2053270).
+    while (retry_count := 3):
+        try:
+            with jubilant.temp_model() as juju:
+                yield juju
+                break
+        except (jubilant._juju.CLIError) as e:
+            if retry_count and "transaction aborted" in e.stderr:
+                retry_count -= 1
+                time.sleep(0.1)
+                continue
+            raise e
 
 def test_deploy(juju: jubilant.Juju):
     juju.deploy(microovn_charm_path)
