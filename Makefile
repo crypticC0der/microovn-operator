@@ -1,4 +1,5 @@
 VENV := .venv
+PARALLEL ?= 1
 PYTHON := $(VENV)/bin/python
 PIP := $(VENV)/bin/pip
 CHARMS := token-distributor microovn
@@ -9,13 +10,11 @@ build:
 	done
 
 $(VENV):
-	python3 -m venv $(VENV)
-	$(PIP) install --upgrade pip
-	$(PIP) install pytest
-	$(PIP) install jubilant
+	python3 -m venv $(VENV) --upgrade-deps
+	$(PIP) install -r tests/requirements.txt
 
 test: $(VENV)
-	./$(VENV)/bin/pytest tests
+	./$(VENV)/bin/pytest -v -n $(PARALLEL) tests
 
 clean:
 	$(MAKE) -C token-distributor clean
