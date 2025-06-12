@@ -36,7 +36,7 @@ def test_integrate(juju: jubilant.Juju):
     juju.integrate("microovn","microcluster-token-distributor")
     juju.wait(jubilant.all_active)
     juju.exec("microovn status", unit="microovn/1")
-    
+
 def test_integrate_post_start(juju: jubilant.Juju):
     juju.deploy(microovn_charm_path)
     juju.deploy(token_distributor_charm_path)
@@ -46,7 +46,7 @@ def test_integrate_post_start(juju: jubilant.Juju):
     juju.add_unit("microovn")
     juju.wait(jubilant.all_active)
     juju.exec("microovn status", unit="microovn/1")
-    
+
 def test_token_distributor_down(juju: jubilant.Juju):
     juju.deploy(microovn_charm_path)
     juju.deploy(token_distributor_charm_path)
