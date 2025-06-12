@@ -21,6 +21,7 @@ def juju(request: pytest.FixtureRequest):
     while (retry_count := 3):
         try:
             with jubilant.temp_model(keep=keep_models) as juju:
+                juju.wait_timeout = 15 * 60
                 yield juju
                 break
         except (jubilant._juju.CLIError) as e:
