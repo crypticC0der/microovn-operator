@@ -158,10 +158,24 @@ class MicroovnCharm(ops.CharmBase):
 
     def _on_install(self, event: ops.InstallEvent):
         self.unit.status = ops.MaintenanceStatus("Installing microovn snap")
+        while retries := 3:
+            try:
+                subprocess.run(
+                    ["snap", "wait", "system", "seed.loaded"],
+                    check=True)
+                subprocess.run(
+                    ["snap", "install", "microovn", "--channel", "latest/edge"],
+                    check=True)
+                break
+            except subprocess.CalledProcessError as e:
+                if retries:
+                    retries -= 1
+                    self.unit.status = ops.MaintenanceStatus(
+                        f"Snap install failed, {retries} retries left")
+                    time.sleep(1)
+                    continue
+                raise e
 
-        subprocess.run(
-            ["snap", "install", "microovn", "--channel", "latest/edge"],
-            check=True)
         self.unit.status = ops.MaintenanceStatus("Waiting for microovn ready")
         retries = 0
         while (code := call_microovn_command("waitready")[0]):
