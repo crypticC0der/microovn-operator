@@ -25,6 +25,11 @@ def juju(request: pytest.FixtureRequest):
                 juju.wait_timeout = 15 * 60
                 juju.wait = functools.partial(juju.wait,
                                               error=jubilant.any_error)
+                juju.model_config({
+                    'image-stream': 'daily',
+                    'enable-os-upgrade': 'false',
+                })
+
                 yield juju
                 break
         except (jubilant._juju.CLIError) as e:
