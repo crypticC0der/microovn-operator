@@ -1,3 +1,4 @@
+import functools
 import time
 
 import jubilant
@@ -22,6 +23,8 @@ def juju(request: pytest.FixtureRequest):
         try:
             with jubilant.temp_model(keep=keep_models) as juju:
                 juju.wait_timeout = 15 * 60
+                juju.wait = functools.partial(juju.wait,
+                                              error=jubilant.any_error)
                 yield juju
                 break
         except (jubilant._juju.CLIError) as e:
