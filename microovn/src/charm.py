@@ -4,6 +4,7 @@ import logging
 import os
 import time
 import subprocess
+from pathlib import Path
 
 import ops
 
@@ -28,6 +29,10 @@ CSR_ATTRIBUTES = CertificateRequestAttributes(
     common_name="Charmed MicroOVN",
     is_ca=True,
 )
+
+SECURE_FILE_MODE = 0o600
+def secure_opener(path, flags):
+    return os.open(path, flags, SECURE_FILE_MODE)
 
 def get_hostname():
     return os.uname().nodename
@@ -137,7 +142,7 @@ class MicroovnCharm(ops.CharmBase):
         super().__init__(framework)
         self._stored.set_default(in_cluster=False)
 
-        self.ca_dir = self.charm_dir / "pki"
+        self.ca_dir = Path("/var/snap/microovn/common/data/pki")
         self.certificates = TLSCertificatesRequiresV4(
             charm=self,
             relationship_name=CERTIFICATES_RELATION,
@@ -170,11 +175,15 @@ class MicroovnCharm(ops.CharmBase):
             logger.debug("Certificate or private key is not available")
             return
         cert_updated = self._store_certificate(
-            certificate=provider_certificate.certificate
+            certificate=str(provider_certificate.certificate) + "\n" + str(provider_certificate.ca)
         )
         key_updated = self._store_private_key(private_key=private_key)
-
-        # return certificate_update_required or private_key_update_required
+        needs_update = self._is_certificate_update_required(cert_updated) or \
+            self._is_private_key_update_required(private_key)
+        call_microovn_command("certificates", "set-ca",
+                                "--cert", self._certificate_path().as_posix(),
+                                "--key", self._private_key_path().as_posix())
+        return needs_update
 
     def _is_certificate_update_required(self, certificate: Certificate) -> bool:
         return self._get_existing_certificate() != certificate
@@ -188,34 +197,40 @@ class MicroovnCharm(ops.CharmBase):
     def _get_existing_private_key(self) -> Optional[PrivateKey]:
         return self._get_stored_private_key() if self._private_key_is_stored() else None
 
+    def _certificate_path(self):
+        return self.ca_dir / CERTIFICATE_NAME
+
+    def _private_key_path(self):
+        return self.ca_dir / PRIVATE_KEY_NAME
+
     def _certificate_is_stored(self) -> bool:
-        return os.path.isfile(self.ca_dir / CERTIFICATE_NAME)
+        return os.path.isfile(self._certificate_path())
 
     def _private_key_is_stored(self) -> bool:
-        return os.path.isfile(self.ca_dir / PRIVATE_KEY_NAME)
+        return os.path.isfile(self._private_key_path())
 
     def _get_stored_certificate(self) -> Certificate:
-        with open(self.ca_dir / CERTIFICATE_NAME, "r") as cert_file:
+        with open(self._certificate_path(), "r") as cert_file:
             return Certificate.from_string(cert_file.read())
 
     def _get_stored_private_key(self) -> PrivateKey:
-        with open(self.ca_dir / PRIVATE_KEY_NAME, "r") as key_file:
+        with open(self._private_key_path(), "r") as key_file:
             return PrivateKey.from_string(key_file.read())
 
-    def _store_certificate(self, certificate: Certificate) -> bool:
+    def _store_certificate(self, certificate) -> bool:
         """Store certificate in workload."""
         if self._is_certificate_update_required(certificate):
-            with open(self.ca_dir / CERTIFICATE_NAME, "w") as cert_file:
+            with open(self._certificate_path(), "w", opener=secure_opener) as cert_file:
                 cert_file.write(str(certificate))
-            logger.info("Pushed certificate pushed to workload")
+                logger.info("Pushed certificate to workload")
             return True
         return False
 
     def _store_private_key(self, private_key: PrivateKey) -> bool:
         if self._is_private_key_update_required(private_key):
-            with open(self.ca_dir / PRIVATE_KEY_NAME, "w") as key_file:
+            with open(self._private_key_path(), "w", opener=secure_opener) as key_file:
                 key_file.write(str(private_key))
-            logger.info("Pushed private key to workload")
+                logger.info("Pushed private key to workload")
             return True
         return False
 
