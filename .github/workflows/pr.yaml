@@ -27,7 +27,6 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: microovn
-
       - name: Set charm paths
         run: |
           set -- ${{ needs.pack-microovn.outputs.charms }}
@@ -42,6 +41,12 @@ jobs:
       - name: Prepare Environment for functional tests
         run: |
           sudo concierge prepare -p machine
+
+      - name: Build interface consumer
+        working-directory: tests/interface-consumer
+        run: |
+          make build
+          echo "INTERFACE_CONSUMER_CHARM_PATH=tests/interface-consumer/interface-consumer_amd64.charm" >> $GITHUB_ENV
 
       - name: Run test
         run: make test
