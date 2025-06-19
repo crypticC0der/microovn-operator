@@ -76,3 +76,17 @@ def test_integrate_ovsdb(juju: jubilant.Juju):
     data = jout["interface-consumer/0"]["relation-info"][0]["application-data"]
     assert(data.get("db_nb_connection_str"))
     assert(data.get("db_sb_connection_str"))
+
+def test_certificates_integration(juju: jubilant.Juju):
+    juju.deploy(microovn_charm_path)
+    juju.add_unit("microovn")
+    juju.deploy(token_distributor_charm_path)
+    juju.deploy("self-signed-certificates")
+    juju.integrate("microovn","microcluster-token-distributor")
+    juju.integrate("microovn","self-signed-certificates")
+    juju.wait(jubilant.all_active)
+    juju.wait(lambda _: "Pushed certificate to workload" in juju.debug_log(limit=20))
+    destination = juju.status().apps["microovn"].units["microovn/1"].public_address
+    destination = destination + ":6643"
+    output = juju.exec("openssl s_client -connect {0} -CAfile /tmp/ca-cert.pem".format(destination), unit="self-signed-certificates/0")
+    assert("CONNECTED" in output.stdout)
