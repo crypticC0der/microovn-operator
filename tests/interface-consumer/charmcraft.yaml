@@ -14,10 +14,21 @@ parts:
     build-packages:
       - git
       - python3-dev
+      - cargo
+      - libffi-dev
+      - libssl-dev
+      - pkg-config
+      - rustc
 
 requires:
   ovsdb:
     interface: ovsdb
+  certificates:
+    interface: tls-certificates
+
+charm-libs:
+  - lib: tls_certificates_interface.tls_certificates
+    version: "4"
 
 config:
   options: {}

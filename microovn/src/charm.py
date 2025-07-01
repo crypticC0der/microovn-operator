@@ -29,11 +29,6 @@ CSR_ATTRIBUTES = CertificateRequestAttributes(
     common_name="Charmed MicroOVN",
     is_ca=True,
 )
-
-SECURE_FILE_MODE = 0o600
-def secure_opener(path, flags):
-    return os.open(path, flags, SECURE_FILE_MODE)
-
 def get_hostname():
     return os.uname().nodename
 
@@ -144,7 +139,6 @@ class MicroovnCharm(ops.CharmBase):
         super().__init__(framework)
         self._stored.set_default(in_cluster=False)
 
-        self.ca_dir = Path("/var/snap/microovn/common/data/pki")
         self.certificates = TLSCertificatesRequiresV4(
             charm=self,
             relationship_name=CERTIFICATES_RELATION,
