@@ -17,7 +17,7 @@ Integration tests are implemented using the
 executed using the `check-system` or `test` targets:
 
 ```shell
-make check-system
+make test
 ```
 
 Optionally tests may be run in parallel, for environments with sufficient
@@ -40,6 +40,14 @@ Build the charms in this git repository using:
 
 ```shell
 make
+```
+
+## Clean the build environment
+
+Remove files created during build with:
+
+```shell
+make clean
 ```
 
 <!-- You may want to include any contribution/style guidelines in this document>
