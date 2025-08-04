@@ -1,5 +1,6 @@
 import json
 import os
+import time
 
 import jubilant
 
@@ -31,6 +32,9 @@ def test_integrate(juju: jubilant.Juju):
     juju.integrate("microovn", "microcluster-token-distributor")
     juju.wait(jubilant.all_active)
     juju.exec("microovn status", unit="microovn/1")
+    juju.model_config({'update-status-hook-interval': '1s'})
+    time.sleep(2)
+    juju.wait(jubilant.all_active)
 
 
 def test_integrate_post_start(juju: jubilant.Juju):
