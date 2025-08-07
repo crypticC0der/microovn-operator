@@ -16,7 +16,8 @@ def is_command_passing(juju, commandstring, unitname):
     try:
         juju.exec(commandstring, unit=unitname)
         return True
-    except:
+    except Exception as e:
+        print(e)
         return False
 
 
@@ -32,7 +33,7 @@ def test_integrate(juju: jubilant.Juju):
     juju.integrate("microovn", "microcluster-token-distributor")
     juju.wait(jubilant.all_active)
     juju.exec("microovn status", unit="microovn/1")
-    juju.model_config({'update-status-hook-interval': '1s'})
+    juju.model_config({"update-status-hook-interval": "1s"})
     time.sleep(2)
     juju.wait(jubilant.all_active)
 
@@ -137,9 +138,13 @@ def test_certificates_integration(juju: jubilant.Juju):
     juju.wait(
         lambda _: is_command_passing(juju, "ls /root/pki/consumer.pem", "interface-consumer/0")
     )
-    command_str = "openssl s_client -connect {0} -CAfile /root/pki/ca.pem -cert /root/pki/consumer.pem -key /root/pki/consumer.key -verify_return_error".format(
-        destination
-    )
+    command_str = (
+        "openssl s_client -connect {0} "
+        "-CAfile /root/pki/ca.pem "
+        "-cert /root/pki/consumer.pem "
+        "-key /root/pki/consumer.key "
+        "-verify_return_error"
+    ).format(destination)
     output = juju.exec(command_str, unit="interface-consumer/0")
 
 

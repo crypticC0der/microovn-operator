@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
+import logging
+import os
 from pathlib import Path
 
-import logging
 import ops
-import os
-
 from charms.microovn.v0.ovsdb import OVSDBRequires
 from charms.tls_certificates_interface.v4.tls_certificates import (
     Certificate,
@@ -23,6 +22,7 @@ CSR_ATTRIBUTES = CertificateRequestAttributes(
     common_name="interface consumer",
     is_ca=False,
 )
+
 
 class InterfaceConsumerCharm(ops.CharmBase):
     ovsdb_requires = None
@@ -51,7 +51,7 @@ class InterfaceConsumerCharm(ops.CharmBase):
         self.unit.status = ops.MaintenanceStatus("connected to ovsdb")
 
     def _on_ovsdb_changed(self, event: ops.RelationChangedEvent):
-        if constr := self.ovsdb_requires.get_connection_strings():
+        if self.ovsdb_requires.get_connection_strings():
             self.unit.status = ops.ActiveStatus("got string")
 
     def _on_certificates_available(self, _: ops.EventBase):
@@ -61,12 +61,8 @@ class InterfaceConsumerCharm(ops.CharmBase):
         if not provider_certificate or not private_key:
             logger.debug("Certificate or private key is not available")
             return
-        cert_updated = self._store_certificate(
-            certificate=provider_certificate.certificate
-        )
-        ca_updated = self._store_ca(
-            certificate=provider_certificate.ca
-        )
+        cert_updated = self._store_certificate(certificate=provider_certificate.certificate)
+        ca_updated = self._store_ca(certificate=provider_certificate.ca)
         key_updated = self._store_private_key(private_key=private_key)
         return key_updated or cert_updated or ca_updated
 
@@ -89,6 +85,7 @@ class InterfaceConsumerCharm(ops.CharmBase):
             key_file.write(str(private_key))
         logger.info("Pushed private key to workload")
         return True
+
 
 if __name__ == "__main__":  # pragma: nocover
     ops.main(InterfaceConsumerCharm)
