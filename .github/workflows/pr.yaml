@@ -4,16 +4,54 @@ on:
   pull_request:
 
 jobs:
+  inclusive-naming:
+    name: Inclusive naming
+    uses: canonical/Inclusive-naming/.github/workflows/woke.yaml@main
+    with:
+      fail-on-error: "false"
+
+  codeql:
+    name: CodeQL analysis
+    runs-on: ubuntu-24.04
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: python
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+
+  code-checks:
+    name: Code Checks
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Tox
+        run: |
+          sudo snap install astral-uv --classic
+          uv tool install tox --with tox-uv
+      - name: Check Code
+        run: make check-code
+
   pack-microcluster-token-distributor:
     uses: canonical/microcluster-token-distributor-operator/.github/workflows/pack.yaml@main
     with:
       name: microcluster-token-distributor
       path: token-distributor
+
   pack-microovn:
     uses: canonical/microcluster-token-distributor-operator/.github/workflows/pack.yaml@main
     with:
       name: microovn
       path: microovn
+
   test:
     runs-on: ubuntu-latest
     needs:

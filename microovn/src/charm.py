@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+
+"""Microovn Charm.
+
+This charm provides logic for managing a microovn cluster and any relations with
+other charms it may need
+"""
+
 import logging
 import subprocess
 import time
@@ -26,6 +33,7 @@ CSR_ATTRIBUTES = CertificateRequestAttributes(
 
 
 def call_microovn_command(*args, stdin=None):
+    """Call the command microovn with the given arguments."""
     result = subprocess.run(
         ["microovn", *args],
         stdout=subprocess.PIPE,
@@ -37,6 +45,8 @@ def call_microovn_command(*args, stdin=None):
 
 
 class MicroovnCharm(ops.CharmBase):
+    """The implementation of the majority of the charms logic."""
+
     _stored = ops.StoredState()
     ovsdb_provides = None
 
@@ -90,7 +100,10 @@ class MicroovnCharm(ops.CharmBase):
             or not self.ovsdbcms_requires.remote_ready()
         ):
             logger.debug(
-                "not going into dataplane mode, one of these is false in_cluster: {0}, relation_exists: {1}, remote_ready: {2}".format(
+                (
+                    "not going into dataplane mode, one of these is false in_cluster: "
+                    "{0}, relation_exists: {1}, remote_ready: {2}"
+                ).format(
                     self._stored.in_cluster,
                     self.model.get_relation(OVSDBCMD_RELATION),
                     self.ovsdbcms_requires.remote_ready(),
@@ -133,7 +146,8 @@ class MicroovnCharm(ops.CharmBase):
             and not self._microovn_central_exists()
         ):
             self.unit.status = ops.BlockedStatus(
-                "microovn has no central nodes, this could either be due to a recently broken ovsdb-cms relation or a configuration issue"
+                "microovn has no central nodes, this could either be due to a "
+                + "recently broken ovsdb-cms relation or a configuration issue"
             )
 
     def _on_ovsdbcms_broken(self, _: ops.EventBase):
