@@ -109,7 +109,7 @@ class MicroovnCharm(ops.CharmBase):
                     self.ovsdbcms_requires.remote_ready(),
                 )
             )
-            return
+            return False
 
         self.unit.status = ops.MaintenanceStatus("switching to dataplane mode")
         err, output = call_microovn_command("disable", "central", "--allow-disable-last-central")
@@ -127,6 +127,7 @@ class MicroovnCharm(ops.CharmBase):
                 self.unit.status = ops.MaintenanceStatus("failed switching to dataplane mode")
                 return False
         self.unit.status = ops.ActiveStatus()
+        return True
 
     def _microovn_central_exists(self):
         if not self._stored.in_cluster:
@@ -172,7 +173,7 @@ class MicroovnCharm(ops.CharmBase):
         )
         if not provider_certificate or not private_key:
             logger.debug("Certificate or private key is not available")
-            return
+            return False
         combined_cert = str(provider_certificate.certificate) + "\n" + str(provider_certificate.ca)
         combined_input = combined_cert + "\n" + str(private_key)
         err, output = call_microovn_command(
