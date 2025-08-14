@@ -190,3 +190,23 @@ def test_ovn_k8s_integration(juju: jubilant.Juju):
 
     juju_k8s.cli("switch", juju_k8s_model, include_model=False)
     juju_k8s.destroy_model(juju_k8s.model, destroy_storage=True, force=True)
+
+
+def test_certificates_before_token_distributor(juju: jubilant.Juju):
+    juju.deploy(microovn_charm_path)
+    juju.add_unit("microovn")
+    juju.deploy("self-signed-certificates")
+    juju.integrate("microovn", "self-signed-certificates")
+    juju.wait(lambda status: jubilant.all_active(status, "self-signed-certificates"))
+    juju.wait(lambda status: jubilant.all_maintenance(status, "microovn"))
+    juju.deploy(token_distributor_charm_path)
+    juju.integrate("microovn", "microcluster-token-distributor")
+    juju.wait(jubilant.all_active)
+    juju.wait(lambda _: "CA certificate updated, new certificates issued" in juju.debug_log())
+    destination = juju.status().apps["microovn"].units["microovn/1"].public_address
+    destination = destination + ":6643"
+    command_str = "openssl s_client -connect {0} -CAfile /tmp/ca-cert.pem || true".format(
+        destination
+    )
+    output = juju.exec(command_str, unit="self-signed-certificates/0")
+    assert "Verification: OK" in output.stdout
