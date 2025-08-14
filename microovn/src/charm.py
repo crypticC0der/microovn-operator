@@ -159,7 +159,7 @@ class MicroovnCharm(ops.CharmBase):
     def _on_ovsdbcms_ready(self, _: ops.EventBase):
         self._dataplane_mode()
 
-    def _on_certificates_available(self, _: ops.EventBase):
+    def _on_certificates_available(self, event: ops.EventBase):
         """Check if the certificate or private key needs an update and perform the update.
 
         This method retrieves the currently assigned certificate and private key associated with
@@ -167,6 +167,10 @@ class MicroovnCharm(ops.CharmBase):
         or needs to be updated. If an update is necessary, the new certificate or private key is
         stored.
         """
+        if not self._stored.in_cluster:
+            event.defer()
+            return False
+
         provider_certificate, private_key = self.certificates.get_assigned_certificate(
             certificate_request=CSR_ATTRIBUTES
         )
