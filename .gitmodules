@@ -1,3 +1,0 @@
-[submodule "token-distributor"]
-	path = token-distributor
-	url = https://github.com/canonical/microcluster-token-distributor-operator.git

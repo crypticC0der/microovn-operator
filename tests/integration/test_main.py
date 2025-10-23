@@ -22,14 +22,13 @@ def is_command_passing(juju, commandstring, unitname):
 
 
 microovn_charm_path = get_charm_from_env("MICROOVN_CHARM_PATH")
-token_distributor_charm_path = get_charm_from_env("TOKEN_DISTRIBUTOR_CHARM_PATH")
 dummy_charm_path = get_charm_from_env("INTERFACE_CONSUMER_CHARM_PATH")
 
 
 def test_integrate(juju: jubilant.Juju):
     juju.deploy(microovn_charm_path)
     juju.add_unit("microovn")
-    juju.deploy(token_distributor_charm_path)
+    juju.deploy("microcluster-token-distributor", channel="latest/edge")
     juju.integrate("microovn", "microcluster-token-distributor")
     juju.wait(jubilant.all_active)
     juju.exec("microovn status", unit="microovn/1")
@@ -40,7 +39,7 @@ def test_integrate(juju: jubilant.Juju):
 
 def test_integrate_post_start(juju: jubilant.Juju):
     juju.deploy(microovn_charm_path)
-    juju.deploy(token_distributor_charm_path)
+    juju.deploy("microcluster-token-distributor", channel="latest/edge")
     juju.wait(lambda status: jubilant.all_active(status, "microcluster-token-distributor"))
     juju.wait(lambda status: jubilant.all_maintenance(status, "microovn"))
     juju.integrate("microovn", "microcluster-token-distributor")
@@ -51,7 +50,7 @@ def test_integrate_post_start(juju: jubilant.Juju):
 
 def test_token_distributor_down(juju: jubilant.Juju):
     juju.deploy(microovn_charm_path)
-    juju.deploy(token_distributor_charm_path)
+    juju.deploy("microcluster-token-distributor", channel="latest/edge")
     juju.integrate("microovn", "microcluster-token-distributor")
     juju.add_unit("microovn")
     juju.wait(jubilant.all_active)
@@ -65,7 +64,7 @@ def test_token_distributor_down(juju: jubilant.Juju):
 def test_microcluster_leader_down(juju: jubilant.Juju):
     juju.deploy(microovn_charm_path)
     juju.add_unit("microovn")
-    juju.deploy(token_distributor_charm_path)
+    juju.deploy("microcluster-token-distributor", channel="latest/edge")
     juju.integrate("microovn", "microcluster-token-distributor")
     juju.wait(jubilant.all_active)
     output = juju.exec("microovn cluster list -f json", unit="microovn/0").stdout
@@ -88,7 +87,7 @@ def test_microcluster_leader_down(juju: jubilant.Juju):
 def test_integrate_ovsdb(juju: jubilant.Juju):
     juju.deploy(microovn_charm_path)
     juju.add_unit("microovn")
-    juju.deploy(token_distributor_charm_path)
+    juju.deploy("microcluster-token-distributor", channel="latest/edge")
     juju.integrate("microovn", "microcluster-token-distributor")
     juju.wait(jubilant.all_active)
     juju.deploy(dummy_charm_path)
@@ -106,7 +105,7 @@ def test_integrate_ovsdb(juju: jubilant.Juju):
 def test_certificates_integration(juju: jubilant.Juju):
     juju.deploy(microovn_charm_path)
     juju.add_unit("microovn")
-    juju.deploy(token_distributor_charm_path)
+    juju.deploy("microcluster-token-distributor", channel="latest/edge")
     juju.deploy("self-signed-certificates")
     juju.integrate("microovn", "microcluster-token-distributor")
     juju.integrate("microovn", "self-signed-certificates")
@@ -151,7 +150,7 @@ def test_certificates_integration(juju: jubilant.Juju):
 def test_ovn_k8s_integration(juju: jubilant.Juju):
     juju.deploy(microovn_charm_path)
     juju.add_unit("microovn")
-    juju.deploy(token_distributor_charm_path)
+    juju.deploy("microcluster-token-distributor", channel="latest/edge")
     juju.deploy("self-signed-certificates")
     juju.integrate("microovn", "microcluster-token-distributor")
     juju.integrate("microovn", "self-signed-certificates")
@@ -199,7 +198,7 @@ def test_certificates_before_token_distributor(juju: jubilant.Juju):
     juju.integrate("microovn", "self-signed-certificates")
     juju.wait(lambda status: jubilant.all_active(status, "self-signed-certificates"))
     juju.wait(lambda status: jubilant.all_maintenance(status, "microovn"))
-    juju.deploy(token_distributor_charm_path)
+    juju.deploy("microcluster-token-distributor", channel="latest/edge")
     juju.integrate("microovn", "microcluster-token-distributor")
     juju.wait(jubilant.all_active)
     juju.wait(lambda _: "CA certificate updated, new certificates issued" in juju.debug_log())
