@@ -67,7 +67,7 @@ OVN Southbound: OK (20.33.0)
 
     ctx = testing.Context(charm.MicroovnCharm)
     with ctx(ctx.on.start(), testing.State()) as manager:
-        manager.charm._stored.in_cluster = in_cluster
+        manager.charm.token_consumer._stored.in_cluster = in_cluster
         try:
             output = manager.charm._microovn_central_exists()
             assert output is (in_cluster and "central" in services)
@@ -96,7 +96,7 @@ def test_dataplane_mode_passes(microovn_command, leader):
         patch.object(manager.charm, "_set_central_ips_config") as set_central_ips_config,
     ):
         set_central_ips_config.return_value = True
-        manager.charm._stored.in_cluster = True
+        manager.charm.token_consumer._stored.in_cluster = True
         assert manager.charm._dataplane_mode()
         assert manager.charm.ovsdbcms_requires.bound_addresses()
         microovn_command.assert_called_once_with(
@@ -118,7 +118,7 @@ def test_set_central_ips_config(microovn_command, logger_error, return_code):
     )
     microovn_command.return_value = (return_code, "")
     with ctx(ctx.on.start(), testing.State(relations=[ovsdb_relation])) as manager:
-        manager.charm._stored.in_cluster = True
+        manager.charm.token_consumer._stored.in_cluster = True
         assert manager.charm._set_central_ips_config() == (not return_code)
         assert manager.charm.ovsdbcms_requires.bound_addresses()
         microovn_command.assert_called_once_with(
@@ -140,7 +140,7 @@ def test_on_ovsdbcms_broken_passes(microovn_command, logger_error, microovn_comm
         ctx(ctx.on.start(), testing.State()) as manager,
         patch.object(manager.charm, "_microovn_central_exists") as central_exists,
     ):
-        manager.charm._stored.in_cluster = True
+        manager.charm.token_consumer._stored.in_cluster = True
         central_exists.return_value = False
         manager.charm._on_ovsdbcms_broken(None)
         microovn_command.assert_called_once_with("config", "delete", "ovn.central-ips")
@@ -202,6 +202,7 @@ def test_on_certs_available(
             priv_key = tls_certs.PrivateKey(raw=fake_priv_key)
         get_certs.return_value = (provider_cert, priv_key)
         microovn_command.return_value = (microovn_command_return_code, microovn_command_output)
+        manager.charm.token_consumer._stored.in_cluster = True
 
         try:
             output = manager.charm._on_certificates_available(None)
