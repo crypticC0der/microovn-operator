@@ -17,4 +17,5 @@ $(CHARMFILE): charm-libs src/charm.py charmcraft.yaml
 clean:
 	rm -rf lib/charms/microovn/v0
 	rm -rf lib/charms/tls_certificates_interface/v4
+	rm -rf $(CHARMFILE)
 	charmcraft clean

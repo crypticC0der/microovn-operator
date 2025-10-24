@@ -47,13 +47,10 @@ def call_microovn_command(*args, stdin=None):
 class MicroovnCharm(ops.CharmBase):
     """The implementation of the majority of the charms logic."""
 
-    _stored = ops.StoredState()
     ovsdb_provides = None
 
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
-        self._stored.set_default(in_cluster=False)
-
         self.certificates = TLSCertificatesRequiresV4(
             charm=self,
             relationship_name=CERTIFICATES_RELATION,
@@ -95,7 +92,7 @@ class MicroovnCharm(ops.CharmBase):
 
     def _dataplane_mode(self):
         if (
-            not self._stored.in_cluster
+            not self.token_consumer._stored.in_cluster
             or not self.model.get_relation(OVSDBCMD_RELATION)
             or not self.ovsdbcms_requires.remote_ready()
         ):
@@ -104,7 +101,7 @@ class MicroovnCharm(ops.CharmBase):
                     "not going into dataplane mode, one of these is false in_cluster: "
                     "{0}, relation_exists: {1}, remote_ready: {2}"
                 ).format(
-                    self._stored.in_cluster,
+                    self.token_consumer._stored.in_cluster,
                     self.model.get_relation(OVSDBCMD_RELATION),
                     self.ovsdbcms_requires.remote_ready(),
                 )
@@ -130,7 +127,7 @@ class MicroovnCharm(ops.CharmBase):
         return True
 
     def _microovn_central_exists(self):
-        if not self._stored.in_cluster:
+        if not self.token_consumer._stored.in_cluster:
             return False
         err, output = call_microovn_command("status")
         if err:
@@ -142,7 +139,7 @@ class MicroovnCharm(ops.CharmBase):
 
     def _update_status(self, _: ops.EventBase):
         if (
-            self._stored.in_cluster
+            self.token_consumer._stored.in_cluster
             and not self.model.get_relation(OVSDBCMD_RELATION)
             and not self._microovn_central_exists()
         ):
@@ -168,7 +165,7 @@ class MicroovnCharm(ops.CharmBase):
         or needs to be updated. If an update is necessary, the new certificate or private key is
         stored.
         """
-        if not self._stored.in_cluster:
+        if not self.token_consumer._stored.in_cluster:
             event.defer()
             return False
 
@@ -224,7 +221,7 @@ class MicroovnCharm(ops.CharmBase):
             time.sleep(1)
 
     def _on_cluster_changed(self, event: ops.RelationChangedEvent):
-        if self._stored.in_cluster:
+        if self.token_consumer._stored.in_cluster:
             self.ovsdb_provides.update_relation_data()
             self._dataplane_mode()
 

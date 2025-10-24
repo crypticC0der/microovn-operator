@@ -102,7 +102,7 @@ class OVSDBProvides(Object):
 
     def update_relation_data(self):
         """Update the data stored in the application databag for the relation."""
-        if not (self.charm.unit.is_leader() and self.charm._stored.in_cluster):
+        if not (self.charm.unit.is_leader() and self.charm.token_consumer._stored.in_cluster):
             return
 
         if not (relation := self.charm.model.get_relation(self.relation_name)):

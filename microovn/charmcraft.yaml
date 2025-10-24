@@ -44,3 +44,5 @@ requires:
 charm-libs:
   - lib: tls_certificates_interface.tls_certificates
     version: "4"
+  - lib: microcluster_token_distributor.token_distributor 
+    version: "0.1"

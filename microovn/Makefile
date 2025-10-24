@@ -5,7 +5,12 @@ TOKENDISTLIB := lib/charms/microcluster_token_distributor/v0/token_distributor.p
 
 build: $(CHARMFILE)
 
-$(CHARMFILE): src/charm.py charmcraft.yaml metadata.yaml $(OVSDBLIB) $(TOKENDISTLIB)
+$(TOKENDISTLIB):
+	charmcraft fetch-lib microcluster_token_distributor.token_distributor
+
+charm-libs: $(TOKENDISTLIB) $(OVSDBLIB)
+
+$(CHARMFILE): src/charm.py charmcraft.yaml metadata.yaml charm-libs
 	charmcraft pack -v
 
 clean:
