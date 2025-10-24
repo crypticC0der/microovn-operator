@@ -25,6 +25,7 @@ OVSDB_RELATION = "ovsdb"
 WORKER_RELATION = "cluster"
 CERTIFICATES_RELATION = "certificates"
 OVSDBCMD_RELATION = "ovsdb-external"
+MICROOVN_CHANNEL = "latest/edge"
 
 CSR_ATTRIBUTES = CertificateRequestAttributes(
     common_name="Charmed MicroOVN",
@@ -195,7 +196,7 @@ class MicroovnCharm(ops.CharmBase):
             try:
                 subprocess.run(["snap", "wait", "system", "seed.loaded"], check=True)
                 subprocess.run(
-                    ["snap", "install", "microovn", "--channel", "latest/edge"], check=True
+                    ["snap", "install", "microovn", "--channel", MICROOVN_CHANNEL], check=True
                 )
                 break
             except subprocess.CalledProcessError as e:
