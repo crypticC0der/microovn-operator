@@ -12,12 +12,24 @@ sudo concierge prepare -p machine
 
 ## Testing
 
-Integration tests are implemented using the
-[Jubilant](https://github.com/canonical/jubilant) framework, and can be
-executed using the `check-system` or `test` targets:
+We have Unit tests and standard linting tests, to run these you need to set up 
+uv and tox, this is easily done like so:
 
 ```shell
-make test
+snap install astral-uv --classic
+uv tool install tox --with tox-uv 
+```
+
+Linting and other code checks are done as part of the ``check-code`` target. 
+Unit tests are a part of the `check-system` target, however they can be run on 
+their own with the `check-unit` target.
+
+Integration tests are implemented using the
+[Jubilant](https://github.com/canonical/jubilant) framework, and can be
+executed using the `check-system` or `check-integration` targets:
+
+```shell
+make check-integration
 ```
 
 Optionally tests may be run in parallel, for environments with sufficient
@@ -32,6 +44,13 @@ temporarily created models for further investigation.
 
 ```shell
 make check-system TESTSUITEFLAGS=--keep-models
+```
+
+Finally, we have the `test` target that runs code tests, unit tests and 
+integration tests.
+
+```shell
+make test PARALLEL=4 TESTSUITEFLAGS=--keep-models
 ```
 
 ## Build the charms
