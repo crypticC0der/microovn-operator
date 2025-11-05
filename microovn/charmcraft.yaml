@@ -18,6 +18,7 @@ platforms:
 
 parts:
   charm:
+    charm-strict-dependencies: true
     build-packages:
       - git
       - python3-dev
