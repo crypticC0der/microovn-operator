@@ -8,6 +8,9 @@ type: charm
 # (Recommended)
 title: MicroOVN Charm
 
+links:
+  source: https://github.com/canonical/microovn-operator
+
 # (Required for 'charm' type)
 platforms:
   ubuntu@24.04:amd64:
