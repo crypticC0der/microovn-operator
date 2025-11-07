@@ -3,11 +3,11 @@ summary: Dummy consumer for testing interfaces
 description: Just for testing
 type: charm
 
-base: ubuntu@24.04
+links:
+  source: https://github.com/canonical/microovn-operator
+
 platforms:
-  amd64:
-    build-on: [amd64]
-    build-for: [amd64]
+  ubuntu@24.04:amd64:
 
 parts:
   charm:
