@@ -11,6 +11,8 @@ platforms:
 
 parts:
   charm:
+    source: .
+    plugin: uv
     build-packages:
       - git
       - python3-dev
@@ -19,6 +21,8 @@ parts:
       - libssl-dev
       - pkg-config
       - rustc
+    build-snaps:
+      - astral-uv
 
 requires:
   ovsdb:

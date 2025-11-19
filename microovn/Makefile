@@ -8,9 +8,12 @@ build: $(CHARMFILE)
 $(TOKENDISTLIB):
 	charmcraft fetch-lib microcluster_token_distributor.token_distributor
 
+uv.lock: pyproject.toml
+	uv lock
+
 charm-libs: $(TOKENDISTLIB) $(OVSDBLIB)
 
-$(CHARMFILE): src/charm.py charmcraft.yaml metadata.yaml charm-libs
+$(CHARMFILE): src/charm.py charmcraft.yaml metadata.yaml charm-libs uv.lock
 	charmcraft pack -v
 
 clean:
