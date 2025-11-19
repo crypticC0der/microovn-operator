@@ -31,7 +31,7 @@ check-unit: get-libs
 	tox -e unit
 
 check-integration: $(VENV)
-	./$(VENV)/bin/pytest -v -n $(PARALLEL) tests/integration $(TESTSUITEFLAGS)
+	./$(VENV)/bin/pytest -v -n $(PARALLEL) $(TESTSUITEFLAGS)
 
 check-system: check-integration check-unit
 
