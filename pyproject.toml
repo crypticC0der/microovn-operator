@@ -4,6 +4,7 @@ version = "1.0"
 dependencies = [
     "ops ~= 2.17",
     "cryptography==44.0.1",
+    "maturin<1.1.0",
     "pydantic==2.9.1",
 ]
 
