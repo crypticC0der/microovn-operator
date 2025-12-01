@@ -26,11 +26,11 @@ parts:
     build-packages:
       - git
       - python3-dev
-      - cargo
+      - cargo-1.85
       - libffi-dev
       - libssl-dev
       - pkg-config
-      - rustc
+      - rustc-1.85
 
 requires:
   ovsdb:
