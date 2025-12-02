@@ -9,9 +9,12 @@ lib/charms/tls_certificates_interface/v4/tls_certificates.py: ../../microovn/lib
 	mkdir -p lib/charms/tls_certificates_interface
 	cp -r ../../microovn/lib/charms/tls_certificates_interface/v4/ lib/charms/tls_certificates_interface/
 
+poetry.lock: pyproject.toml
+	poetry lock
+
 charm-libs: lib/charms/microovn/v0/ovsdb.py lib/charms/tls_certificates_interface/v4/tls_certificates.py
 
-$(CHARMFILE): charm-libs src/charm.py charmcraft.yaml
+$(CHARMFILE): charm-libs src/charm.py charmcraft.yaml poetry.lock
 	charmcraft pack
 
 clean:

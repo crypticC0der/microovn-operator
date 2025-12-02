@@ -1,5 +1,5 @@
 DIRNAME := $(shell basename $(CURDIR))
-CHARMFILE := microovn_amd64.charm
+CHARMFILE := microovn_ubuntu@24.04-amd64.charm
 OVSDBLIB := lib/charms/microovn/v0/ovsdb.py
 TOKENDISTLIB := lib/charms/microcluster_token_distributor/v0/token_distributor.py
 
