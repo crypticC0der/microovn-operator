@@ -21,10 +21,12 @@ from charms.tls_certificates_interface.v4.tls_certificates import (
     generate_private_key,
 )
 from ops import testing
+from scenario.errors import UncaughtCharmError
 
 from charm import MicroovnCharm
 from constants import (
     CERTIFICATES_RELATION,
+    MICROOVN_TRACK,
     OVN_EXPORTER_METRICS_ENDPOINT,
     OVSDB_RELATION,
     OVSDBCMD_RELATION,
@@ -875,3 +877,43 @@ def test_on_bootstrapped(
     mock_logger.info.assert_any_call(
         "microovn cluster was bootstrapped or joined, enabling the exporter"
     )
+
+
+@patch("snap_manager.snap.add")
+@patch("snap_manager.snap.SnapCache")
+def test_on_config_changed_success(mock_snap_cache, mock_snap_add):
+    """Test config changed everything as expected."""
+    ctx = testing.Context(MicroovnCharm)
+    state_in = testing.State(config={"microovn_risk": "edge/sunbeam"})
+    ctx.run(ctx.on.config_changed(), state_in)
+    mock_snap_add.assert_called_with("microovn", channel=MICROOVN_TRACK + "/edge/sunbeam")
+
+
+@patch("charm.SnapManager")
+def test_on_config_changed_no_refresh_if_channel_same(mock_snap_manager):
+    """If the snap is already on the desired channel, do nothing."""
+    ctx = testing.Context(MicroovnCharm)
+    mock_snap_instance = MagicMock()
+    mock_snap_instance.snap_client.channel = MICROOVN_TRACK + "/edge"
+    mock_snap_manager.return_value = mock_snap_instance
+    state_in = testing.State(config={"microovn_risk": "edge"})
+    ctx.run(ctx.on.config_changed(), state_in)
+    mock_snap_instance.install.assert_not_called()
+
+
+def test_on_config_changed_invalid_risk(mock_microovn_snap, mock_logger):
+    """Test config changed with an invalid risk."""
+    ctx = testing.Context(MicroovnCharm)
+    state_in = testing.State(config={"microovn_risk": "beta"})
+    with pytest.raises(UncaughtCharmError):
+        ctx.run(ctx.on.config_changed(), state_in)
+    mock_microovn_snap.install.assert_not_called()
+
+
+def test_on_config_changed_invalid_branch(mock_microovn_snap):
+    """Test config changed with invalid branch."""
+    ctx = testing.Context(MicroovnCharm)
+    state_in = testing.State(config={"microovn_risk": "edge/branch/extra"})
+    with pytest.raises(UncaughtCharmError):
+        ctx.run(ctx.on.config_changed(), state_in)
+    mock_microovn_snap.install.assert_not_called()
