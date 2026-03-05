@@ -19,12 +19,13 @@ from charms.microovn.v0.ovsdb import OVSDBProvides
 from charms.ovn_central_k8s.v0.ovsdb import OVSDBCMSRequires
 from charms.tls_certificates_interface.v4.tls_certificates import Mode, TLSCertificatesRequiresV4
 
+from config import MicroovnConfig
 from constants import (
     ALERT_RULES_DIR,
     CERTIFICATES_RELATION,
     CSR_ATTRIBUTES,
     DASHBOARDS_DIR,
-    MICROOVN_CHANNEL,
+    MICROOVN_TRACK,
     OVN_EXPORTER_CHANNEL,
     OVN_EXPORTER_METRICS_ENDPOINT,
     OVN_EXPORTER_METRICS_PATH,
@@ -92,6 +93,8 @@ class MicroovnCharm(ops.CharmBase):
             refresh_events=[self.on.config_changed],
         )
 
+        self.typed_config = self.load_config(MicroovnConfig, errors="blocked")
+
         framework.observe(self.on.install, self._on_install)
         framework.observe(self.on[WORKER_RELATION].relation_changed, self._on_cluster_changed)
         framework.observe(self.on.update_status, self._on_update_status)
@@ -104,13 +107,19 @@ class MicroovnCharm(ops.CharmBase):
         framework.observe(self.ovsdbcms_requires.on.goneaway, self._on_ovsdbcms_broken)
         framework.observe(self.token_consumer.on.bootstrapped, self._on_bootstrapped_or_joined)
         framework.observe(self.token_consumer.on.joined, self._on_bootstrapped_or_joined)
+        framework.observe(self.on.config_changed, self._on_config_changed)
 
     # PROPERTIES
+
+    @property
+    def microovn_snap_channel(self) -> str:
+        """Return the channel based of the track and risk for the microovn snap."""
+        return MICROOVN_TRACK + "/" + self.typed_config.microovn_risk
 
     @cached_property
     def microovn_snap_client(self) -> SnapManager:  # pragma: nocover
         """Return the snap client."""
-        return SnapManager("microovn", MICROOVN_CHANNEL)
+        return SnapManager("microovn", self.microovn_snap_channel)
 
     @cached_property
     def ovn_exporter_snap_client(self) -> SnapManager:  # pragma: nocover
@@ -153,6 +162,13 @@ class MicroovnCharm(ops.CharmBase):
             return
 
         self.unit.status = ops.ActiveStatus()
+
+    def _on_config_changed(self, event: ops.ConfigChangedEvent):
+        if self.microovn_snap_channel == self.microovn_snap_client.snap_client.channel:
+            return
+        self.unit.status = ops.MaintenanceStatus("Refreshing MicroOVN snap")
+        self.microovn_snap_client.install()
+        self._on_update_status(event)
 
     def _on_ovsdbcms_broken(self, event: ops.EventBase) -> None:
         """Handle the ovsdb-cms goneaway event."""
