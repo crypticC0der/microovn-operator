@@ -19,8 +19,9 @@ and CI pipeline to avoid manual effort on each new release.
 Steps to cut a stable branch:
 1. Create a branch "branch-YY.MM" at the commit agreed for version cutoff.
 2. Create a commit "Prepare for YY.MM", This should:
-   - Set the charmcraft base to ~ubuntu@YY.MM~
-   - Update MICROOVN_CHANNEL in microovn/src/charm.py to "YY.MM/stable"
+   - Set the charmcraft base to ~ubuntu@YY.04~
+   - Update MICROOVN_TRACK in microovn/src/charm.py to "YY.MM"
+   - Update the default risk in charmcraft.yaml to "stable"
 3. Create a PR named "YY.MM Release" for the branch "branch-YY.MM" containing
     this commit.
 4. Review and merge.
