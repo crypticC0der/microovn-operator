@@ -64,7 +64,7 @@ variables:
 - ~MICROOVN_CHARM_PATH~: Path to a pre-built microovn charm (default:
   auto-detected from cwd)
 - ~INTERFACE_CONSUMER_CHARM_PATH~: Path to a pre-built interface-consumer
-  charm (default: auto-detected from ~tests/interface-consumer/~)
+  charm (default: auto-detected from [[file:tests/interface-consumer][tests/interface-consumer]])
 
 If you're not using ~concierge~ to set up your test environment, you can
 use the ~LXD_CONTROLLER~ and ~K8S_CONTROLLER~ variables to point to your
