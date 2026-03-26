@@ -140,34 +140,37 @@ jobs:
 
           echo "MicroOVN charm: $MICROOVN_CHARM_PATH"
           echo "Interface consumer charm: $INTERFACE_CONSUMER_CHARM_PATH"
-
-      - name: Install dependencies
+          echo "LXD_CONTROLLER=github-lxd" >> $GITHUB_ENV
+          echo "K8S_CONTROLLER=github-k8s" >> $GITHUB_ENV
+      - name: Install Snaps (Juju, K8s, LXD)
         run: |
-          sudo snap install concierge --classic
-          sudo apt-get update
-          sudo apt-get install -y tox
+          sudo snap install juju --channel=3.6/stable
+          sudo snap install k8s --channel=latest/stable --classic
+          # LXD is usually pre-installed on Ubuntu runners, but we ensure it's ready
+          sudo lxd init --auto
+          sudo usermod -a -G lxd $USER
 
-      - name: Prepare Environment
+      - name: Initialize Kubernetes
         run: |
-          cat <<EOF > /tmp/concierge.yaml
-          juju:
-            channel: 3.6/stable
+          # Bootstrap the single-node k8s cluster
+          sudo k8s status --wait-ready
 
-          providers:
-            microk8s:
-              enable: true
-              bootstrap: true
-              addons:
-                - dns
-                - hostpath-storage
-                - metallb
+          # Create .kube directory and export the config for Juju/Kubectl
+          mkdir -p $HOME/.kube
+          sudo k8s kubectl config view --raw | tee $HOME/.kube/config
+          chmod 600 $HOME/.kube/config
 
-            lxd:
-              enable: true
-              bootstrap: true
-          EOF
+      - name: Bootstrap Juju
+        run: |
+          # Add the k8s cluster as a Juju cloud
+          # We use the 'k8s' snap's config we just exported
+          juju add-k8s k8s-cloud --kubeconfig=$HOME/.kube/config
 
-          sudo concierge prepare -c /tmp/concierge.yaml
+          juju bootstrap k8s-cloud ${{ env.K8S_CONTROLLER }}
+          juju bootstrap localhost ${{ env.LXD_CONTROLLER }}
+
+          # Default to the K8s controller for the tests
+          juju switch ${{ env.LXD_CONTROLLER }}
 
       - name: Run tests
         run: make check-integration TESTSUITEFLAGS="${{ matrix.test }}"
