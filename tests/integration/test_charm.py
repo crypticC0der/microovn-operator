@@ -206,12 +206,7 @@ def test_ovn_k8s_integration(
     lxd_model_name = juju_lxd.show_model().name
     k8s_model_name = juju_k8s.show_model().name
 
-    juju_lxd.deploy(charm_path)
-    juju_lxd.add_unit(app_name)
-    juju_lxd.deploy(TOKEN_DISTRIBUTOR_CHARM, channel=TOKEN_DISTRIBUTOR_CHANNEL)
     juju_lxd.deploy(SELF_SIGNED_CERTIFICATES_CHARM, channel=SELF_SIGNED_CERTIFICATES_CHANNEL)
-    juju_lxd.integrate(app_name, TOKEN_DISTRIBUTOR_CHARM)
-    juju_lxd.integrate(app_name, SELF_SIGNED_CERTIFICATES_CHARM)
     juju_lxd.wait(jubilant.all_active)
     juju_lxd.offer(
         f"{lxd_model_name}.{SELF_SIGNED_CERTIFICATES_CHARM}",
@@ -221,8 +216,8 @@ def test_ovn_k8s_integration(
     )
 
     # setup ovn-central-k8s and its relations
-    juju_k8s.deploy(OVN_CENTRAL_K8S_CHARM, channel=OVN_CENTRAL_K8S_CHANNEL, num_units=3)
-    juju_k8s.deploy(OVN_RELAY_K8S_CHARM, channel=OVN_RELAY_K8S_CHANNEL, num_units=3, trust=True)
+    juju_k8s.deploy(OVN_CENTRAL_K8S_CHARM, channel=OVN_CENTRAL_K8S_CHANNEL, num_units=1)
+    juju_k8s.deploy(OVN_RELAY_K8S_CHARM, channel=OVN_RELAY_K8S_CHANNEL, num_units=1, trust=True)
     juju_k8s.integrate(OVN_CENTRAL_K8S_CHARM, OVN_RELAY_K8S_CHARM)
     juju_k8s.integrate(OVN_CENTRAL_K8S_CHARM, f"{juju_lxd.model}.{certs_offer_name}")
     juju_k8s.integrate(OVN_RELAY_K8S_CHARM, f"{juju_lxd.model}.{certs_offer_name}")
@@ -235,6 +230,14 @@ def test_ovn_k8s_integration(
         name=cms_relay_offer_name,
         controller=k8s_controller_name,
     )
+
+    juju_lxd.deploy(charm_path)
+    juju_lxd.add_unit(app_name)
+    juju_lxd.deploy(TOKEN_DISTRIBUTOR_CHARM, channel=TOKEN_DISTRIBUTOR_CHANNEL)
+    juju_lxd.integrate(app_name, TOKEN_DISTRIBUTOR_CHARM)
+    juju_lxd.integrate(app_name, SELF_SIGNED_CERTIFICATES_CHARM)
+    juju_lxd.wait(jubilant.all_active)
+
     juju_lxd.integrate(app_name, f"{juju_k8s.model}.{cms_relay_offer_name}")
     wait_with_retry(juju_lxd, jubilant.all_active)
     wait_with_retry(juju_lxd, jubilant.all_agents_idle)
