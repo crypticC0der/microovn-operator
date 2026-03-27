@@ -59,7 +59,7 @@ juju relate opentelemetry-collector loki-logging
 #+end_src
 
 *** Alerts and dashboards
-Alert rules are packaged in ~src/prometheus_alert_rules/alerts.yaml~:
+Alert rules are packaged in [[file:src/prometheus_alert_rules/alerts.yaml][src/prometheus_alert_rules/alerts.yaml]]:
 
 | Alert | Summary |
 |-------+---------|
@@ -78,7 +78,7 @@ Alert rules are packaged in ~src/prometheus_alert_rules/alerts.yaml~:
 | ~OvnControllerTransactionIncomplete~ | ovn-controller reported incomplete transactions in last 10m. |
 | ~OvsVswitchdFileDescriptorsHigh~ | ovs-vswitchd using >90% of file descriptors. |
 
-Dashboards are packaged in ~src/dashboards/~:
+Dashboards are packaged in [[file:src/dashboards][src/dashboards/]]:
 
 | Dashboard | Grafana name | Summary |
 |-----------+--------------+---------|
