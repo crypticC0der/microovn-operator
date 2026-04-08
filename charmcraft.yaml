@@ -70,6 +70,10 @@ config:
       default: edge
       description: the risk we use for installing the microovn snap alongside a static track
       type: string
+    ovn_exporter_risk:
+      default: edge
+      description: the risk we use for installing the ovn-exporter snap alongside a static track
+      type: string
 
 charm-libs:
   - lib: tls_certificates_interface.tls_certificates
