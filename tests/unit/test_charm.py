@@ -32,6 +32,7 @@ from constants import (
     MICROOVN_OVSDB_DIR,
     MICROOVN_TRACK,
     OVN_EXPORTER_METRICS_ENDPOINT,
+    OVN_EXPORTER_TRACK,
     OVSDB_RELATION,
     OVSDBCMD_RELATION,
     WORKER_RELATION,
@@ -898,25 +899,29 @@ def test_on_config_changed_success(mock_snap_cache, mock_snap_add):
     ctx = testing.Context(MicroovnCharm)
     state_in = testing.State(config={"microovn_risk": "edge/sunbeam"})
     ctx.run(ctx.on.config_changed(), state_in)
-    mock_snap_add.assert_called_with("microovn", channel=MICROOVN_TRACK + "/edge/sunbeam")
+    mock_snap_add.assert_any_call("microovn", channel=MICROOVN_TRACK + "/edge/sunbeam")
 
 
 @patch("charm.SnapManager")
 def test_on_config_changed_no_refresh_if_channel_same(mock_snap_manager):
     """If the snap is already on the desired channel, do nothing."""
+    microovn_snap = MagicMock()
+    microovn_snap.snap_client.channel = MICROOVN_TRACK + "/edge"
+
+    ovn_exporter_snap = MagicMock()
+    ovn_exporter_snap.snap_client.channel = OVN_EXPORTER_TRACK + "/edge"
+
+    mock_snap_manager.side_effect = [microovn_snap, ovn_exporter_snap]
     ctx = testing.Context(MicroovnCharm)
-    mock_snap_instance = MagicMock()
-    mock_snap_instance.snap_client.channel = MICROOVN_TRACK + "/edge"
-    mock_snap_manager.return_value = mock_snap_instance
-    state_in = testing.State(config={"microovn_risk": "edge"})
+    state_in = testing.State(config={"microovn_risk": "edge", "ovn_exporter_risk": "edge"})
     ctx.run(ctx.on.config_changed(), state_in)
-    mock_snap_instance.install.assert_not_called()
+    microovn_snap.install.assert_not_called()
 
 
 def test_on_config_changed_invalid_risk(mock_microovn_snap, mock_logger):
     """Test config changed with an invalid risk."""
     ctx = testing.Context(MicroovnCharm)
-    state_in = testing.State(config={"microovn_risk": "beta"})
+    state_in = testing.State(config={"microovn_risk": "vriska"})
     with pytest.raises(UncaughtCharmError):
         ctx.run(ctx.on.config_changed(), state_in)
     mock_microovn_snap.install.assert_not_called()

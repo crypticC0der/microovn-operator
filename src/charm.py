@@ -21,7 +21,7 @@ from charms.microovn.v0.ovsdb import OVSDBProvides
 from charms.ovn_central_k8s.v0.ovsdb import OVSDBCMSRequires
 from charms.tls_certificates_interface.v4.tls_certificates import Mode, TLSCertificatesRequiresV4
 
-from config import MicroovnConfig
+from config import CharmConfig
 from constants import (
     ALERT_RULES_DIR,
     APT_OVS_CONF_DB,
@@ -34,11 +34,11 @@ from constants import (
     MICROOVN_OVSDB_DIR,
     MICROOVN_SNAP_COMMON,
     MICROOVN_TRACK,
-    OVN_EXPORTER_CHANNEL,
     OVN_EXPORTER_METRICS_ENDPOINT,
     OVN_EXPORTER_METRICS_PATH,
     OVN_EXPORTER_PLUGS,
     OVN_EXPORTER_PORT,
+    OVN_EXPORTER_TRACK,
     OVSDB_RELATION,
     OVSDBCMD_RELATION,
     WORKER_RELATION,
@@ -101,7 +101,7 @@ class MicroovnCharm(ops.CharmBase):
             refresh_events=[self.on.config_changed],
         )
 
-        self.typed_config = self.load_config(MicroovnConfig, errors="blocked")
+        self.typed_config = self.load_config(CharmConfig, errors="blocked")
 
         framework.observe(self.on.install, self._on_install)
         framework.observe(self.on[WORKER_RELATION].relation_changed, self._on_cluster_changed)
@@ -126,6 +126,11 @@ class MicroovnCharm(ops.CharmBase):
         """Return the channel based of the track and risk for the microovn snap."""
         return MICROOVN_TRACK + "/" + self.typed_config.microovn_risk
 
+    @property
+    def ovn_exporter_snap_channel(self) -> str:
+        """Return the channel based of the track and risk for the microovn snap."""
+        return OVN_EXPORTER_TRACK + "/" + self.typed_config.ovn_exporter_risk
+
     @cached_property
     def microovn_snap_client(self) -> SnapManager:  # pragma: nocover
         """Return the snap client."""
@@ -134,7 +139,7 @@ class MicroovnCharm(ops.CharmBase):
     @cached_property
     def ovn_exporter_snap_client(self) -> SnapManager:  # pragma: nocover
         """Return the snap client."""
-        return SnapManager("ovn-exporter", OVN_EXPORTER_CHANNEL)
+        return SnapManager("ovn-exporter", self.ovn_exporter_snap_channel)
 
     @property
     def is_in_cluster(self) -> bool:
@@ -174,11 +179,14 @@ class MicroovnCharm(ops.CharmBase):
         self.unit.status = ops.ActiveStatus()
 
     def _on_config_changed(self, event: ops.ConfigChangedEvent):
-        if self.microovn_snap_channel == self.microovn_snap_client.snap_client.channel:
-            return
-        self.unit.status = ops.MaintenanceStatus("Refreshing MicroOVN snap")
-        self.microovn_snap_client.install()
-        self._on_update_status(event)
+        if self.microovn_snap_channel != self.microovn_snap_client.snap_client.channel:
+            self.unit.status = ops.MaintenanceStatus("Refreshing MicroOVN snap")
+            self.microovn_snap_client.install()
+            self._on_update_status(event)
+        if self.ovn_exporter_snap_channel != self.ovn_exporter_snap_client.snap_client.channel:
+            self.unit.status = ops.MaintenanceStatus("Refreshing OVN exporter snap")
+            self.ovn_exporter_snap_client.install()
+            self._on_update_status(event)
 
     def _on_ovsdbcms_broken(self, event: ops.EventBase) -> None:
         """Handle the ovsdb-cms goneaway event."""
