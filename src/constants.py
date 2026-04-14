@@ -11,6 +11,7 @@ OVSDB_RELATION = "ovsdb"
 WORKER_RELATION = "cluster"
 CERTIFICATES_RELATION = "certificates"
 OVSDBCMD_RELATION = "ovsdb-external"
+ROLE_ASSIGNMENT_RELATION = "role-assignment"
 MICROOVN_TRACK = "latest"
 VALID_SNAP_RISKS = ["stable", "candidate", "beta", "edge"]
 DASHBOARDS_DIR = "./src/dashboards"
