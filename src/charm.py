@@ -300,7 +300,19 @@ class MicroovnCharm(ops.CharmBase):
         subprocess.run(["systemctl", "disable", "--now", APT_OVS_SERVICE])
         subprocess.run(["modprobe", "-r", "openvswitch"])
         subprocess.run(["modprobe", "openvswitch"])
-        subprocess.run(["apt", "remove", "-y", *APT_OVS_PACKAGES])
+
+        # Some services such as netplan check for ovs-vsctl in usr/bin before
+        # snap/bin to work out which to use, we want it using ovs-vsctl provided
+        # by microovn but we cannot remove certain packages such as ovs-doca. So
+        # we must just remove the binary. This will cause maintenance headaches
+        # and is a bad solution but we do not have a better one.
+        #
+        # I hope this code is not here for long. (17/04/26)
+        subprocess.run(["rm", "-f", "/usr/bin/ovs-vsctl"])
+
+        # Removes existing OVS as two versions of openvswitch running at once
+        # causes many issues we would like to avoid.
+        subprocess.run(["apt", "remove", "-y", "--allow-change-held-packages", *APT_OVS_PACKAGES])
 
     def _on_prebootstrap_or_prejoin(self, event: ops.EventBase) -> None:
         """Handle the pre join/pre bootstrap hook."""
