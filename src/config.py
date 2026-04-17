@@ -6,22 +6,23 @@
 
 import pydantic
 
-from constants import MICROOVN_VALID_RISKS
+from constants import VALID_SNAP_RISKS
 
 
-class MicroovnConfig(pydantic.BaseModel):
+class CharmConfig(pydantic.BaseModel):
     """Config class for managing the microovn risk config option."""
 
     microovn_risk: str = pydantic.Field("edge")
+    ovn_exporter_risk: str = pydantic.Field("edge")
 
-    @pydantic.field_validator("microovn_risk")
+    @pydantic.field_validator("microovn_risk", "ovn_exporter_risk")
     @classmethod
     def validate_risk(cls, risk: str):
         """Ensure risk is a valid risk."""
         risk_parts = risk.split("/")
-        if risk_parts[0] not in MICROOVN_VALID_RISKS:
+        if risk_parts[0] not in VALID_SNAP_RISKS:
             raise ValueError(
-                risk + " not a valid risk, valid risks are: " + ", ".join(MICROOVN_VALID_RISKS)
+                risk + " not a valid risk, valid risks are: " + ", ".join(VALID_SNAP_RISKS)
             )
         if len(risk_parts) > 2:
             raise ValueError(risk + " has too many parts, should at most be risk/branch")
