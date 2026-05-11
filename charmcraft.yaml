@@ -29,11 +29,12 @@ parts:
   rust-deps:
     plugin: nil
     build-packages:
-      - rustup
+      - cargo-1.91
+      - rustc-1.91
     override-build: |
+      ln -s /usr/bin/rustc-1.91 /usr/bin/rustc
+      ln -s /usr/bin/cargo-1.91 /usr/bin/cargo
       craftctl default
-      rustup set profile minimal
-      rustup default 1.92.0
       cargo --version
   poetry-deps:
     plugin: nil
