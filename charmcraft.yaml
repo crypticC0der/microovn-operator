@@ -19,11 +19,11 @@ links:
   website: https://charmhub.io/microovn
 
 platforms:
-  ubuntu@24.04:amd64:
-  ubuntu@24.04:arm64:
-  ubuntu@24.04:ppc64el:
-  ubuntu@24.04:riscv64:
-  ubuntu@24.04:s390x:
+  ubuntu@26.04:amd64:
+  ubuntu@26.04:arm64:
+  ubuntu@26.04:ppc64el:
+  ubuntu@26.04:riscv64:
+  ubuntu@26.04:s390x:
 
 parts:
   rust-deps:
@@ -68,7 +68,7 @@ parts:
 config:
   options:
     microovn_risk:
-      default: edge
+      default: stable
       description: the risk we use for installing the microovn snap alongside a static track
       type: string
     ovn_exporter_risk:
