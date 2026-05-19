@@ -68,7 +68,7 @@ parts:
 config:
   options:
     microovn_risk:
-      default: stable
+      default: edge
       description: the risk we use for installing the microovn snap alongside a static track
       type: string
     ovn_exporter_risk:
