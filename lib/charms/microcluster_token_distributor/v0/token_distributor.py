@@ -460,7 +460,9 @@ class TokenConsumer(ops.framework.Object):
 
     def _on_install(self, event: ops.InstallEvent):
         if not self.charm.model.get_relation(self.relation_name):
-            self.charm.unit.status = ops.MaintenanceStatus("Waiting for token distrbutor relation")
+            self.charm.unit.status = ops.MaintenanceStatus(
+                "Waiting for token distributor relation"
+            )
 
     def _on_remove(self, event: ops.RemoveEvent):
         if self._stored.in_cluster:
