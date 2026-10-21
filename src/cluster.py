@@ -4,8 +4,6 @@
 """MicroOVN-specific initialization for the token distributor consumer."""
 
 import logging
-import subprocess
-import tempfile
 from functools import cached_property
 from ipaddress import IPv6Address, ip_address
 
@@ -14,6 +12,7 @@ import yaml
 from charms.microcluster_token_distributor.v0 import token_distributor
 
 from constants import DATA_BINDING, WORKER_RELATION
+from utils import call_microovn_command
 
 logger = logging.getLogger(__name__)
 
@@ -87,19 +86,9 @@ class TokenConsumer(token_distributor.TokenConsumer):
             preseed["token"] = token
 
         try:
-            # MicroOVN detects preseed input on stdin; there is no --preseed
-            # flag. The anonymous, mode-0600 file also keeps join tokens out of
-            # argv and is removed on both success and failure.
-            with tempfile.TemporaryFile(mode="w+", encoding="utf-8") as seed:
-                yaml.safe_dump(preseed, seed)
-                seed.seek(0)
-                result = subprocess.run(
-                    ["microovn", "init"],
-                    stdin=seed,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    text=True,
-                )
+            # MicroOVN reads its preseed from stdin; there is no --preseed
+            # flag, and passing it there keeps the join token out of argv.
+            result = call_microovn_command("init", stdin=yaml.safe_dump(preseed))
         except OSError as exc:
             raise InitializationError("Unable to run microovn init") from exc
 

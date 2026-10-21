@@ -4,8 +4,6 @@
 """Exercise initialization through real token-distributor relation events."""
 
 import json
-import os
-import stat
 from dataclasses import replace
 from subprocess import CompletedProcess
 from unittest.mock import MagicMock, patch
@@ -65,15 +63,8 @@ def in_cluster(state):
 @pytest.fixture
 def workload():
     seeds = []
-    files = []
 
     def run(args, **kwargs):
-        if args == ["microovn", "init"]:
-            seed = kwargs["stdin"]
-            assert stat.S_IMODE(os.fstat(seed.fileno()).st_mode) == 0o600
-            files.append(seed)
-            seeds.append(yaml.safe_load(seed))
-            return CompletedProcess(args, 0, stdout="", stderr="")
         assert args[:2] == ["microovn", "cluster"]
         if args[2] == "list":
             return CompletedProcess(
@@ -81,15 +72,22 @@ def workload():
             )
         return CompletedProcess(args, 0, stdout="generated-token")
 
+    def run_init(*args, stdin=None):
+        assert args == ("init",)
+        assert stdin is not None
+        seeds.append(yaml.safe_load(stdin))
+        return CompletedProcess(["microovn", *args], 0, stdout="", stderr="")
+
     with (
-        patch("cluster.subprocess.run", side_effect=run) as command,
+        patch("subprocess.run", side_effect=run) as command,
+        patch("cluster.call_microovn_command", side_effect=run_init) as init_command,
         patch.object(token_distributor, "get_hostname", return_value="node"),
         patch.object(MicroovnCharm, "_migrate_ovs") as migrate,
         patch.object(MicroovnCharm, "ovn_exporter_snap_client", MagicMock()) as exporter,
         patch("charm.microovn_central_exists", return_value=True),
         patch("charm.check_metrics_endpoint", return_value=True),
     ):
-        yield command, seeds, files, migrate, exporter
+        yield command, init_command, seeds, migrate, exporter
 
 
 @pytest.mark.parametrize("mode", ["bootstrap", "join"])
@@ -104,7 +102,7 @@ def workload():
     ],
 )
 def test_initialization_uses_local_bindings(workload, mode, cluster_address, data_address):
-    command, seeds, files, migrate, exporter = workload
+    command, _, seeds, migrate, exporter = workload
     ctx = testing.Context(MicroovnCharm)
     state, relation = initialization_state(mode, cluster_address, data_address)
 
@@ -120,7 +118,6 @@ def test_initialization_uses_local_bindings(workload, mode, cluster_address, dat
             **({"token": TOKEN} if mode == "join" else {}),
         }
     ]
-    assert all(f.closed for f in files)
     assert in_cluster(out)
     migrate.assert_called_once()
     exporter.enable_and_start.assert_called()
@@ -134,7 +131,7 @@ def test_initialization_uses_local_bindings(workload, mode, cluster_address, dat
 @pytest.mark.parametrize("bound_endpoint", [None, "cluster", "data"])
 def test_initialization_uses_default_network(workload, mode, bound_endpoint):
     """Unset endpoints keep Juju's default, including when only one is bound."""
-    _, seeds, _, migrate, exporter = workload
+    _, _, seeds, migrate, exporter = workload
     ctx = testing.Context(MicroovnCharm)
     state, relation = initialization_state(mode)
     state = replace(
@@ -158,7 +155,7 @@ def test_initialization_uses_default_network(workload, mode, bound_endpoint):
 
 def test_shared_cluster_uses_each_units_own_networks(workload):
     """Different NIC order and routed subnets must not reuse the bootstrapper's IP."""
-    _, seeds, _, _, _ = workload
+    _, _, seeds, _, _ = workload
     for app, mode, cluster_address, data_address, interface in [
         ("microovn", "bootstrap", "10.10.0.2", "10.20.0.2", "eth1"),
         ("microovn", "join", "10.10.0.3", "10.20.0.3", "eno4"),
@@ -185,7 +182,7 @@ def test_shared_cluster_uses_each_units_own_networks(workload):
 )
 def test_dual_stack_respects_jujus_selected_address(workload, mode, first, second):
     """Do not override Juju's choice with our own IP-family or interface sorting."""
-    _, seeds, _, _, _ = workload
+    _, _, seeds, _, _ = workload
     ctx = testing.Context(MicroovnCharm)
     state, relation = initialization_state(mode)
     state = replace(
@@ -227,7 +224,7 @@ def test_dual_stack_respects_jujus_selected_address(workload, mode, first, secon
     ],
 )
 def test_unusable_binding_blocks_before_migration(workload, mode, endpoint, address):
-    command, _, _, migrate, exporter = workload
+    command, init_command, _, migrate, exporter = workload
     ctx = testing.Context(MicroovnCharm)
     state, relation = initialization_state(mode)
     invalid = (
@@ -245,6 +242,7 @@ def test_unusable_binding_blocks_before_migration(workload, mode, endpoint, addr
     assert not in_cluster(out)
     migrate.assert_not_called()
     command.assert_not_called()
+    init_command.assert_not_called()
     exporter.enable_and_start.assert_not_called()
     # The charm's later status handler must not hide a binding failure.
     out = ctx.run(ctx.on.update_status(), out)
@@ -254,7 +252,7 @@ def test_unusable_binding_blocks_before_migration(workload, mode, endpoint, addr
 
 @pytest.mark.parametrize("mode", ["bootstrap", "join"])
 def test_missing_network_recovers_on_deferred_event(workload, mode):
-    _, seeds, _, migrate, _ = workload
+    _, _, seeds, migrate, _ = workload
     ctx = testing.Context(MicroovnCharm)
     state, relation = initialization_state(mode)
     with patch.object(ops.Model, "get_binding", side_effect=ops.ModelError("network unavailable")):
@@ -270,14 +268,14 @@ def test_missing_network_recovers_on_deferred_event(workload, mode):
 
 @pytest.mark.parametrize("mode", ["bootstrap", "join"])
 def test_init_failure_is_retryable_and_redacts_token(workload, mode, caplog):
-    command, seeds, files, _, exporter = workload
-    successful_run = command.side_effect
+    command, init_command, seeds, _, exporter = workload
+    successful_run = init_command.side_effect
 
     def fail(args, **kwargs):
         successful_run(args, **kwargs)
         return CompletedProcess(args, 1, stdout=TOKEN, stderr=f"Cannot initialize: {TOKEN}")
 
-    command.side_effect = fail
+    init_command.side_effect = fail
     ctx = testing.Context(MicroovnCharm)
     state, relation = initialization_state(mode)
     out = ctx.run(initialization_event(ctx, mode, relation), state)
@@ -285,7 +283,6 @@ def test_init_failure_is_retryable_and_redacts_token(workload, mode, caplog):
     assert out.unit_status == ops.BlockedStatus(f"MicroOVN {mode} failed; see debug-log")
     assert out.deferred
     assert not in_cluster(out)
-    assert all(f.closed for f in files)
     exporter.enable_and_start.assert_not_called()
     if mode == "join":
         assert TOKEN not in caplog.text
@@ -296,34 +293,31 @@ def test_init_failure_is_retryable_and_redacts_token(workload, mode, caplog):
     assert not in_cluster(out)
     exporter.enable_and_start.assert_not_called()
 
-    command.side_effect = successful_run
+    init_command.side_effect = successful_run
     out = ctx.run(ctx.on.update_status(), out)
     assert in_cluster(out)
     assert out.unit_status == ops.ActiveStatus()
     assert len(seeds) == 3
 
 
-def test_init_execution_error_closes_preseed_and_defers(workload):
-    command, _, files, _, exporter = workload
-    successful_run = command.side_effect
+def test_init_execution_error_defers(workload):
+    _, init_command, _, _, exporter = workload
 
-    def fail(args, **kwargs):
-        successful_run(args, **kwargs)
+    def fail(*args, **kwargs):
         raise FileNotFoundError("microovn")
 
-    command.side_effect = fail
+    init_command.side_effect = fail
     ctx = testing.Context(MicroovnCharm)
     state, relation = initialization_state("join")
     out = ctx.run(initialization_event(ctx, "join", relation), state)
     assert out.unit_status == ops.BlockedStatus("Unable to run microovn init")
     assert not in_cluster(out)
     assert out.deferred
-    assert all(f.closed for f in files)
     exporter.enable_and_start.assert_not_called()
 
 
 def test_bindings_are_resolved_before_ovs_migration(workload):
-    _, seeds, _, migrate, _ = workload
+    _, _, seeds, migrate, _ = workload
     ctx = testing.Context(MicroovnCharm)
     state, relation = initialization_state("bootstrap")
     original_get_binding = ops.Model.get_binding
@@ -341,7 +335,7 @@ def test_bindings_are_resolved_before_ovs_migration(workload):
 
 
 def test_upgrade_preserves_library_state_and_does_not_reinitialize(workload):
-    command, seeds, _, migrate, _ = workload
+    command, init_command, seeds, migrate, _ = workload
     ctx = testing.Context(MicroovnCharm)
     state, relation = initialization_state("join")
     # Seed the stored state using the original library as an older charm would.
