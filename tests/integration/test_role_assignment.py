@@ -8,7 +8,7 @@ import jubilant
 import yaml
 
 TOKEN_DISTRIBUTOR_CHARM = "microcluster-token-distributor"
-TOKEN_DISTRIBUTOR_CHANNEL = "latest/edge"
+TOKEN_DISTRIBUTOR_CHANNEL = "v1/edge"
 ROLE_DISTRIBUTOR_CHARM = "role-distributor"
 ROLE_DISTRIBUTOR_CHANNEL = "latest/candidate"
 

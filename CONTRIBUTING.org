@@ -1,4 +1,22 @@
 * Contributing
+** Token distributor library
+The token distributor library is shared with
+[[https://github.com/canonical/microcluster-token-distributor-operator][microcluster-token-distributor-operator]]. Changes to the vendored library
+must also be published from that project and included in its charm release.
+
+The fix for [[https://bugs.launchpad.net/microovn-operator/+bug/2170962][LP#2170962]] adds a persistent, per-unit request ID.
+A new unit advertises its complete scoped key in the ~hostname~ field as
+~<hostname>:<request-id>~; the MicroOVN communicator still generates tokens
+for the real hostname. New units never fall back to hostname-only tokens,
+which may have already been consumed by a removed unit. Joined legacy units
+retain their requests.
+
+Advertising the scoped key in ~hostname~ keeps MicroOVN compatible with
+distributors that predate request IDs (they mirror the opaque key verbatim),
+so no coordinated upgrade is required to add replacement units. The library
+must still be released in both charms so the distributor understands scoped
+keys directly.
+
 ** Development Setup
 You need ~tox~ for running tests:
 #+begin_src shell
@@ -78,6 +96,12 @@ tox -e integration -- tests/integration/test_charm.py::test_integrate_basic --cl
 #+end_src
 The spaces must be available in the temporary test model. Use IPv6 spaces
 to exercise IPv6 cluster endpoints and encapsulation.
+
+To exercise repeated removal and replacement on the same hostname, including
+verification that each unit gets a distinct token:
+#+begin_src shell
+tox -e integration -- tests/integration/test_charm.py::test_readd_same_hostname
+#+end_src
 
 Optionally tests may be run in parallel, for environments with
 sufficient resources:
