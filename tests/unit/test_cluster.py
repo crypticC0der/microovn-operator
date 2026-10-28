@@ -17,6 +17,7 @@ from ops import testing
 from charm import MicroovnCharm
 
 TOKEN = "private-join-token"
+REQUEST_ID = "test-request-id"
 
 
 def network(endpoint, address, interface="eth1"):
@@ -37,13 +38,25 @@ def initialization_state(mode, cluster_address="10.10.0.2", data_address="10.20.
         "cluster",
         remote_app_data={"bootstrap-app": "microovn"},
         remote_units_data={
-            0: {"mirror": "up", **({"mirror-node": TOKEN} if mode == "join" else {})}
+            0: {
+                "mirror": "up",
+                **({"mirror-node:{0}".format(REQUEST_ID): TOKEN} if mode == "join" else {}),
+            }
         },
     )
+    stored_states = []
+    if mode == "join":
+        stored_states.append(
+            testing.StoredState(
+                owner_path="MicroovnCharm/TokenConsumer[cluster]",
+                content={"in_cluster": False, "token_request_id": REQUEST_ID},
+            )
+        )
     return testing.State(
         leader=mode == "bootstrap",
         relations=[relation],
         networks=[network("cluster", cluster_address), network("data", data_address)],
+        stored_states=stored_states,
     ), relation
 
 
@@ -348,6 +361,7 @@ def test_upgrade_preserves_library_state_and_does_not_reinitialize(workload):
 
     with patch.object(ops.Model, "get_binding", side_effect=AssertionError("Unexpected rebind")):
         state = ctx.run(ctx.on.upgrade_charm(), state)
+        relation = state.get_relation(relation.id)
         state = ctx.run(ctx.on.relation_changed(relation, remote_unit=0), state)
     assert in_cluster(state)
     assert not seeds
