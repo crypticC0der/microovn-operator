@@ -35,6 +35,7 @@ from constants import (
     OVN_EXPORTER_TRACK,
     OVSDB_RELATION,
     OVSDBCMD_RELATION,
+    ROLE_ASSIGNMENT_RELATION,
     WORKER_RELATION,
 )
 from snap_manager import SnapManager
@@ -422,6 +423,55 @@ def test_on_update_status_refreshes_ovsdb_relation_data(
     data = out.get_relation(ovsdb_relation.id).local_app_data
     assert data["db_nb_connection_str"] == fresh.nb
     assert data["db_sb_connection_str"] == fresh.sb
+
+
+def test_ovsdb_refresh_runs_during_bgp_wait(
+    mock_microovn_snap,
+    mock_ovn_exporter_snap,
+    mock_check_metrics_endpoint,
+    mock_call_microovn_command,
+    mock_microovn_central_exists,
+):
+    """Ovsdb relation-data self-heal must run even while BGP waits for bridges."""
+    role_rel = testing.Relation(
+        ROLE_ASSIGNMENT_RELATION,
+        remote_app_data={
+            "assignments": json.dumps(
+                {
+                    "microovn/0": {
+                        "status": "assigned",
+                        "roles": ["chassis"],
+                        "workload-params": {"rack": "rack-a", "peer": "65101@fe80::1"},
+                    }
+                }
+            )
+        },
+    )
+
+    def bgp_run(cmd, *args, **kwargs):
+        if cmd[0] == "microovn.ovn-sbctl" and cmd[1] == "get":
+            return CompletedProcess(cmd, 1, "", "no key")
+        return CompletedProcess(cmd, 0, "", "")
+
+    mock_ovsdb = MagicMock()
+    with (
+        patch("bgp_handler.subprocess.run", side_effect=bgp_run),
+        patch(
+            "role_handler.subprocess.run",
+            return_value=CompletedProcess(args="", returncode=0, stderr="", stdout=""),
+        ),
+    ):
+        ctx = testing.Context(MicroovnCharm)
+        with ctx(
+            ctx.on.update_status(),
+            testing.State(relations=[role_rel]),
+        ) as manager:
+            manager.charm.token_consumer._stored.in_cluster = True
+            manager.charm.ovsdb_provides = mock_ovsdb
+            manager.run()
+
+    mock_ovsdb.update_relation_data.assert_called()
+    assert isinstance(manager.charm.unit.status, ops.WaitingStatus)
 
 
 def test_on_ovsdbcms_broken(
