@@ -20,6 +20,7 @@ from charms.grafana_agent.v0.cos_agent import COSAgentProvider
 from charms.microovn.v0.ovsdb import OVSDBProvides
 from charms.ovn_central_k8s.v0.ovsdb import OVSDBCMSRequires
 
+from bgp_handler import BgpHandler
 from cluster import TokenConsumer
 from config import CharmConfig
 from constants import (
@@ -106,6 +107,11 @@ class MicroovnCharm(ops.CharmBase):
 
         self.typed_config = self.load_config(CharmConfig, errors="blocked")
         self.role_handler = RoleHandler(charm=self, relation_name=ROLE_ASSIGNMENT_RELATION)
+        self.bgp_handler = BgpHandler(
+            charm=self,
+            relation_name=ROLE_ASSIGNMENT_RELATION,
+            role_handler=self.role_handler,
+        )
         framework.observe(
             self.role_handler.requirer.on.role_assignment_changed,
             self._on_role_assignment_changed,
@@ -187,32 +193,23 @@ class MicroovnCharm(ops.CharmBase):
             if self.role_handler.enforce_roles() is not RoleResult.OK:
                 return
 
-        if self.is_dataplane_only and self.unit.is_leader():
-            if not self._set_central_ips_config():
-                self.unit.status = ops.BlockedStatus("Failed to switch to dataplane mode")
-                return
-
-        if self.is_in_cluster and not self.has_ovsdbcmd_relation and not microovn_central_exists():
-            self.unit.status = ops.BlockedStatus(
-                (
-                    "microovn has no central nodes, this could either be due to a "
-                    "recently broken ovsdb-cms relation or a configuration issue"
-                )
-            )
-            return
-
-        if self.is_in_cluster and not check_metrics_endpoint(OVN_EXPORTER_METRICS_ENDPOINT):
-            self.unit.status = ops.BlockedStatus(
-                "ovn-exporter metrics endpoint is not responding, check snap service status"
-            )
+        # Base cluster + metrics health is checked before (and independently
+        # of) BGP, so a transient BGP wait (bridges/LRPs not yet published)
+        # never masks a real backend or metrics outage.
+        if not self._cluster_ready():
             return
 
         # Re-publish the ovsdb connection strings. The central membership may
         # have changed (e.g. a node stopped being a central member) without a
         # relation event firing, leaving stale NB/SB connection strings in the
         # relation databag. Refreshing here self-heals that stale data so that
-        # consumers do not keep trying to connect to a non-central node.
+        # consumers do not keep trying to connect to a non-central node. This
+        # is a cluster-membership self-heal independent of BGP, so it runs even
+        # while BGP is in a transient wait.
         self.ovsdb_provides.update_relation_data()
+
+        if self.bgp_handler.enforce() is not RoleResult.OK:
+            return
 
         self.unit.status = ops.ActiveStatus()
 
@@ -231,7 +228,8 @@ class MicroovnCharm(ops.CharmBase):
         self.role_handler.apply(event)
         # A role change may add or remove the central service on this or other
         # nodes, changing the set of central members. Refresh the ovsdb
-        # connection strings so consumers learn the new membership.
+        # connection strings so consumers learn the new membership. BGP markers
+        # are reconciled by the _on_update_status tail below.
         self.ovsdb_provides.update_relation_data()
         self._on_update_status(event)
 
@@ -406,6 +404,34 @@ class MicroovnCharm(ops.CharmBase):
         self.ovn_exporter_snap_client.enable_and_start()
 
     # HELPERS
+
+    def _cluster_ready(self) -> bool:
+        """Check the cluster backend and metrics, setting status on failure.
+
+        Precondition: called only while =self.is_in_cluster= (the
+        =_on_update_status= early-return guarantees this); the checks guard on
+        it defensively anyway.
+        """
+        if self.is_dataplane_only and self.unit.is_leader():
+            if not self._set_central_ips_config():
+                self.unit.status = ops.BlockedStatus("Failed to switch to dataplane mode")
+                return False
+
+        if self.is_in_cluster and not self.has_ovsdbcmd_relation and not microovn_central_exists():
+            self.unit.status = ops.BlockedStatus(
+                (
+                    "microovn has no central nodes, this could either be due to a "
+                    "recently broken ovsdb-cms relation or a configuration issue"
+                )
+            )
+            return False
+
+        if self.is_in_cluster and not check_metrics_endpoint(OVN_EXPORTER_METRICS_ENDPOINT):
+            self.unit.status = ops.BlockedStatus(
+                "ovn-exporter metrics endpoint is not responding, check snap service status"
+            )
+            return False
+        return True
 
     def _set_central_ips_config(self) -> bool:
         """Set the ovn.central-ips config in microovn."""
