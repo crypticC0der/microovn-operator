@@ -12,7 +12,7 @@ from constants import VALID_SNAP_RISKS
 class CharmConfig(pydantic.BaseModel):
     """Config class for managing the microovn risk config option."""
 
-    microovn_risk: str = pydantic.Field("edge")
+    microovn_risk: str = pydantic.Field("edge/bgp-attach")
     ovn_exporter_risk: str = pydantic.Field("edge")
 
     @pydantic.field_validator("microovn_risk", "ovn_exporter_risk")
